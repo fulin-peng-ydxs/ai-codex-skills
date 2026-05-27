@@ -1,0 +1,4 @@
+interface:
+  display_name: "需求与开发计划生成"
+  short_description: "交互确认后生成或更新需求文档与开发计划，并明确复用与一致性策略"
+  default_prompt: "基于输入与当前项目，先交互确认需求摘要和功能名，再生成/更新 docs/requirements 与 docs/plans 文档并定稿。开发计划中必须明确现有代码锚点、复用方案、接口响应格式和整体实现逻辑的一致性要求，优先复用工具类、公共组件和统一封装。"

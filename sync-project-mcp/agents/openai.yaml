@@ -1,0 +1,4 @@
+interface:
+  display_name: "同步项目 MCP"
+  short_description: "注册并验证当前项目的本地 MCP 服务。"
+  default_prompt: "扫描当前项目的 .codex-mcp 和 .mcp.json，注册缺失的 Codex MCP，完成验证，并用中文报告当前项目 MCP 列表。"
