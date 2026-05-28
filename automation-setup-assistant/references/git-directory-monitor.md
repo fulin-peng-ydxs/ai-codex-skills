@@ -28,28 +28,51 @@ git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=
 
 ## 自动化配置
 
+- 对 Git 多仓库监测，创建多个 `cron` 自动化，每个仓库一个自动化。
+- 不要用一个自动化配置多个 cwd 再在提示词里遍历多个仓库；这可能导致手动执行时多次运行，并引发 `.git/index.lock` 竞争。
+
+第一个自动化：
+
 - 类型：`cron`
-- 名称：`每晚提交技能目录变更`
+- 名称：`每晚提交 Codex 技能目录变更`
 - RRULE: `FREQ=DAILY;BYHOUR=23;BYMINUTE=0;BYSECOND=0`
 - 执行环境：`local`
-- 工作区：
-  - `/Users/pengshuaifeng/.codex/skills`
-  - `/Users/pengshuaifeng/.claude/skills`
+- 工作区：`/Users/pengshuaifeng/.codex/skills`
 
 提示词应要求：
 
 ```text
-监测以下两个 Git 仓库中未被 .gitignore 忽略的文件变化：
-/Users/pengshuaifeng/.codex/skills
-/Users/pengshuaifeng/.claude/skills
-
-对每个仓库执行 git -C <仓库路径> status --porcelain --untracked-files=all。
+监测 Git 仓库 /Users/pengshuaifeng/.codex/skills 中未被 .gitignore 忽略的文件变化。
+执行 git -C /Users/pengshuaifeng/.codex/skills status --porcelain --untracked-files=all。
 如果没有 Git 可见变化，报告该仓库没有变化。
-如果存在任何新增、修改或删除，执行 git -C <仓库路径> add -A。
+如果存在任何新增、修改或删除，执行 git -C /Users/pengshuaifeng/.codex/skills add -A。
 然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成简洁提交信息。
-使用 git -C <仓库路径> commit -m "<提交信息>" 创建提交。
-随后必须使用显式命令 git -C /Users/pengshuaifeng/.codex/skills push 或 git -C /Users/pengshuaifeng/.claude/skills push 推送对应仓库。
-最终用中文报告每个仓库的处理结果、创建的提交 hash，以及 push 是否成功或失败。
+使用 git -C /Users/pengshuaifeng/.codex/skills commit -m "<提交信息>" 创建提交。
+随后必须使用显式命令 git -C /Users/pengshuaifeng/.codex/skills push 推送仓库。
+最终用中文报告处理结果、创建的提交 hash，以及 push 是否成功或失败。
+不要处理其他仓库。
+```
+
+第二个自动化：
+
+- 类型：`cron`
+- 名称：`每晚提交 Claude 技能目录变更`
+- RRULE: `FREQ=DAILY;BYHOUR=23;BYMINUTE=0;BYSECOND=0`
+- 执行环境：`local`
+- 工作区：`/Users/pengshuaifeng/.claude/skills`
+
+提示词应要求：
+
+```text
+监测 Git 仓库 /Users/pengshuaifeng/.claude/skills 中未被 .gitignore 忽略的文件变化。
+执行 git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=all。
+如果没有 Git 可见变化，报告该仓库没有变化。
+如果存在任何新增、修改或删除，执行 git -C /Users/pengshuaifeng/.claude/skills add -A。
+然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成简洁提交信息。
+使用 git -C /Users/pengshuaifeng/.claude/skills commit -m "<提交信息>" 创建提交。
+随后必须使用显式命令 git -C /Users/pengshuaifeng/.claude/skills push 推送仓库。
+最终用中文报告处理结果、创建的提交 hash，以及 push 是否成功或失败。
+不要处理其他仓库。
 ```
 
 ## 授权验证
@@ -62,6 +85,8 @@ git -C /Users/pengshuaifeng/.claude/skills push
 ```
 
 使用 `sandbox_permissions: require_escalated`，并为每条命令设置匹配的持久 `prefix_rule`。
+
+仅在当前线程执行 push 成功不等于自动化验证通过。还需要手动执行一次自动化，并读取对应 `memory.md`，确认没有重复运行、没有 `.git/index.lock`，并确认 push 在自动化线程中是否仍受网络限制。
 
 ## 失败诊断
 
