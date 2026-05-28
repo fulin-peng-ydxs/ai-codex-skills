@@ -42,6 +42,24 @@ description: 用于创建、更新和验证 Codex 自动化任务；也用于排
    - 尽量手动运行一次自动化本身，并检查 `~/.codex/automations/<id>/memory.md`。
    - 如果手动运行失败，必须根据运行记录修正自动化提示词、cwd 拆分或权限策略；只在当前线程验证同名命令不算完整验证。
 
+## Codex 自动化网络处理
+
+当 Codex cron 自动化需要访问网络，例如 `git push`、拉取远端、请求接口时，必须按下面流程处理：
+
+1. 不要擅自把 Codex 自动化改成系统级 `launchd`、`cron` 或其他外部定时任务，除非用户明确要求换方案。
+2. 先确认失败类型：
+   - `Could not resolve hostname`、DNS 失败、network access 失败，通常表示自动化线程处在无网络沙箱。
+   - 当前聊天线程里 `git push` 成功，不等于 Codex 自动化线程也有网络。
+3. 对固定网络命令使用精确稳定命令，例如：
+   - `git -C /Users/pengshuaifeng/.codex/skills push`
+   - `git -C /Users/pengshuaifeng/.claude/skills push`
+4. 在自动化提示词中写明：
+   - 普通执行网络命令失败时，必须用 `require_escalated` 重新执行同一条命令。
+   - 该命令需要匹配一个持久允许规则。
+5. 持久允许规则涉及长期放开命令权限，必须先向用户说明风险并获得明确同意。
+6. 用户同意后，才可在 `~/.codex/rules/default.rules` 中加入精确 `prefix_rule`。规则必须尽量窄，不要写宽泛的 `git push` 或 `git`。
+7. 写入规则后，恢复或更新自动化，再手动运行自动化本身验证。验证通过后，后续定时运行才算闭环。
+
 ## 诊断流程
 
 1. 定位自动化：
@@ -62,6 +80,7 @@ description: 用于创建、更新和验证 Codex 自动化任务；也用于排
 4. 修复可修复的问题：
    - 更新自动化提示词，改用稳定的显式命令。
    - 对需要网络或写入的命令申请授权。
+   - 如果需要无人值守网络访问，向用户说明并申请写入精确持久 `prefix_rule`。
    - 对需要用户凭据、外部服务访问或手动 App 设置的阻塞点，明确说明。
 
 ## Git 目录监测示例

@@ -86,6 +86,20 @@ git -C /Users/pengshuaifeng/.claude/skills push
 
 使用 `sandbox_permissions: require_escalated`，并为每条命令设置匹配的持久 `prefix_rule`。
 
+如果自动化线程里出现 `Could not resolve hostname github.com`，但当前聊天线程中 push 正常，说明问题不是 Git 凭据，而是 Codex 自动化线程网络沙箱。处理方式不是换成系统级定时任务，而是：
+
+1. 向用户说明需要持久放开精确 push 命令的风险。
+2. 等用户明确同意。
+3. 在 `~/.codex/rules/default.rules` 写入精确规则：
+
+```text
+prefix_rule(pattern=["git", "-C", "/Users/pengshuaifeng/.codex/skills", "push"], decision="allow")
+prefix_rule(pattern=["git", "-C", "/Users/pengshuaifeng/.claude/skills", "push"], decision="allow")
+```
+
+4. 更新自动化提示词：普通 push 失败时必须用 `require_escalated` 重试同一条命令。
+5. 手动运行自动化本身验证，而不是只在当前聊天线程执行 push。
+
 仅在当前线程执行 push 成功不等于自动化验证通过。还需要手动执行一次自动化，并读取对应 `memory.md`，确认没有重复运行、没有 `.git/index.lock`，并确认 push 在自动化线程中是否仍受网络限制。
 
 ## 失败诊断
