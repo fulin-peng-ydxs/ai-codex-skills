@@ -46,8 +46,8 @@ git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=
 执行 git -C /Users/pengshuaifeng/.codex/skills status --porcelain --untracked-files=all。
 如果没有 Git 可见变化，报告该仓库没有变化。
 如果存在任何新增、修改或删除，执行 git -C /Users/pengshuaifeng/.codex/skills add -A。
-然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成简洁提交信息。
-使用 git -C /Users/pengshuaifeng/.codex/skills commit -m "<提交信息>" 创建提交。
+然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成提交信息：默认项目标识使用 Agent；单一功能/小改动使用单行模板；多文件、多模块、多个相关改动或需要说明影响范围时使用完整模板；只有明确来源时才写需求来源；多个互不依赖需求时优先在结果中说明建议拆分，若仍需本次自动提交则使用完整模板分组概括。
+使用 git -C /Users/pengshuaifeng/.codex/skills commit -m "<提交信息标题>" 创建提交；如果生成了完整模板，使用多个 -m 参数创建提交，第一个 -m 写标题，后续 -m 写正文段落。
 随后必须使用显式命令 git -C /Users/pengshuaifeng/.codex/skills push 推送仓库。
 最终用中文报告处理结果、创建的提交 hash，以及 push 是否成功或失败。
 不要处理其他仓库。
@@ -68,8 +68,8 @@ git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=
 执行 git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=all。
 如果没有 Git 可见变化，报告该仓库没有变化。
 如果存在任何新增、修改或删除，执行 git -C /Users/pengshuaifeng/.claude/skills add -A。
-然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成简洁提交信息。
-使用 git -C /Users/pengshuaifeng/.claude/skills commit -m "<提交信息>" 创建提交。
+然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成提交信息：默认项目标识使用 Agent；单一功能/小改动使用单行模板；多文件、多模块、多个相关改动或需要说明影响范围时使用完整模板；只有明确来源时才写需求来源；多个互不依赖需求时优先在结果中说明建议拆分，若仍需本次自动提交则使用完整模板分组概括。
+使用 git -C /Users/pengshuaifeng/.claude/skills commit -m "<提交信息标题>" 创建提交；如果生成了完整模板，使用多个 -m 参数创建提交，第一个 -m 写标题，后续 -m 写正文段落。
 随后必须使用显式命令 git -C /Users/pengshuaifeng/.claude/skills push 推送仓库。
 最终用中文报告处理结果、创建的提交 hash，以及 push 是否成功或失败。
 不要处理其他仓库。
