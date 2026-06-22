@@ -45,6 +45,6 @@ metadata/direction-registry.json
 降级时必须：
 
 - 更新 `metadata/direction-registry.json`；
-- 更新对应正式文档的“当前判断”或复盘章节；
+- 更新对应正式文档中受影响的判断或复盘章节；
 - 在文档“更新记录”追加一行；
 - 必要时更新观察清单和复盘记录。
