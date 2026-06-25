@@ -23,7 +23,7 @@
 | `development-trace` | 为当前需求生成开发留痕文档，沉淀改动目标、实现过程和最终结果。 |
 | `dm-mcp-creator` | 创建并注册项目专用的达梦 DM 数据库 MCP 服务，补齐连接配置和安全限制。 |
 | `project-design-md-generator` | 为前端项目生成或更新 `DESIGN.md`，沉淀 UI 规范、设计约束和复用规则。 |
-| `requirement-doc-generator` | 生成项目化需求文档，补齐业务背景、范围、边界、验收标准和风险。 |
+| `requirement-doc-generator` | 在制定开发计划前生成项目化需求文档，结合项目代码、数据库和交互约束补齐业务背景、范围、边界、验收标准与风险。 |
 | `sync-project-mcp` | 同步项目 `.codex-mcp` 与 Codex 本地 MCP 注册信息，并做握手验证。 |
 
 ## 使用方式
