@@ -14,6 +14,7 @@
 
 | 技能目录 | 主要用途 |
 | --- | --- |
+| `ai-instruction-simplifier` | 精简、重构和规范 AI 约束文档、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束。 |
 | `ai-trend-knowledge-maintainer` | 维护 AI 趋势投资知识库，处理候选信息、正式文档、元数据和校验闭环。 |
 | `auto-plan-dev` | 在用户明确点名 `auto-plan-dev` 时，根据需求文档生成可执行开发计划与任务编排清单。 |
 | `automation-setup-assistant` | 创建、更新、验证和排查 Codex 自动化任务，包括权限、网络、Git push、定时执行异常。 |
@@ -23,7 +24,8 @@
 | `development-trace` | 为当前需求生成开发留痕文档，沉淀改动目标、实现过程和最终结果。 |
 | `dm-mcp-creator` | 创建并注册项目专用的达梦 DM 数据库 MCP 服务，补齐连接配置和安全限制。 |
 | `project-design-md-generator` | 为前端项目生成或更新 `DESIGN.md`，沉淀 UI 规范、设计约束和复用规则。 |
-| `requirement-doc-generator` | 在制定开发计划前生成项目化需求文档，结合项目代码、数据库和交互约束补齐业务背景、范围、边界、验收标准与风险。 |
+| `requirement-closure-designer` | 先补全需求在系统中的完整功能闭环、页面入口、角色链路和状态流转，再决定是否进入正式需求文档编写。 |
+| `requirement-doc-generator` | 基于已确认的需求闭环和项目现状生成正式 `requirement.md`，补齐业务背景、范围、边界、验收标准与风险。 |
 | `sync-project-mcp` | 同步项目 `.codex-mcp` 与 Codex 本地 MCP 注册信息，并做握手验证。 |
 
 ## 使用方式
@@ -33,6 +35,7 @@
 3. 使用前优先检查对应目录下的 `SKILL.md`，必要时补充 `references/`、模板或脚本资源。
 4. 新增技能时，至少创建 `技能目录/SKILL.md`，写清名称、用途、触发条件、执行步骤和边界约束。
 5. 如果技能要求显式触发，例如 `auto-plan-dev`，README 和 `SKILL.md` 都要同步写明“只有用户明确点名时才能使用”。
+6. 需求类工作可先用 `requirement-closure-designer` 补齐闭环，再用 `requirement-doc-generator` 生成正式 `requirement.md`；两者职责不要混写。
 
 ## 编写建议
 
