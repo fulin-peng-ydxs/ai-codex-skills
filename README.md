@@ -14,6 +14,7 @@
 
 | 技能目录 | 主要用途 |
 | --- | --- |
+| `ai-constraint-doc-generator` | 生成或重构项目级 AI 通用约束文档，包括 `AGENTS.md` 与 `CLAUDE.md`，并要求基于仓库事实和实际命令验证后再落地。 |
 | `ai-instruction-simplifier` | 精简、重构和规范 AI 约束文档、`DESIGN.md`、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束。 |
 | `ai-trend-knowledge-maintainer` | 维护 AI 趋势投资知识库，处理候选信息、正式文档、元数据和校验闭环。 |
 | `auto-plan-dev` | 在用户明确点名 `auto-plan-dev` 时，根据需求文档和已存在的 HTML 原型生成可执行开发计划与任务编排清单，并在计划更新时同步记录真实落地结果、验证完成情况和页面组件资产闭环。 |
@@ -23,7 +24,9 @@
 | `code-reviewer` | 对本地改动或远程 PR 做代码审查，重点关注正确性、可维护性和规范一致性。 |
 | `development-trace` | 为当前需求生成开发留痕文档，沉淀改动目标、实现过程和最终结果。 |
 | `dm-mcp-creator` | 创建并注册项目专用的达梦 DM 数据库 MCP 服务，补齐连接配置和安全限制。 |
+| `module-architecture-doc-generator` | 基于代码和现有文档按模块生成或更新架构文档，并同步 README/AGENTS 的文档入口。 |
 | `project-design-md-generator` | 为前端项目生成或更新 `DESIGN.md`，沉淀 UI 规范、设计约束和复用规则。 |
+| `project-readme-generator` | 基于仓库事实和实际命令验证生成、重构或优化项目 `README.md`。 |
 | `requirement-closure-designer` | 先补全需求在系统中的完整功能闭环、页面入口、角色链路和状态流转，并为“建议实现”标注处理状态，再决定是否进入正式需求文档编写。 |
 | `requirement-doc-generator` | 基于已确认的需求闭环和项目现状生成正式 `requirement.md`；新增页面需配套 `prototypes/` 下的 HTML 原型，页面条目需识别通用前端能力和配置化承载诉求，建议实现和优化项必须带处理状态，落地前先向用户确认。 |
 | `sync-project-mcp` | 同步项目 `.codex-mcp` 与 Codex 本地 MCP 注册信息，并做握手验证。 |
@@ -50,6 +53,7 @@
 - 技能触发方式、关键资源、维护约束发生变化时，优先更新对应 `SKILL.md`，并同步检查本 README 的“当前技能”和使用说明是否仍准确。
 - 对以需求文档为输入的技能，若新增或调整 `prototypes/`、README、脚本等关键依赖，也要同步检查 README 是否已写清资源职责和先后关系。
 - 若需求闭环、需求文档或开发计划技能新增了稳定状态枚举、范围映射、原型约束、组件资产闭环或是否纳入的约束，也要同步检查 README 是否已写清这些维护规则。
+- 若 AI 约束文档、项目 README 或模块架构文档类技能新增了稳定的命令验证门禁、输出目录规则、薄入口职责分离或文档索引约束，也要同步检查 README 是否已准确反映这些规则。
 
 ## 备注
 

@@ -11,10 +11,14 @@
             "id": "373d107877d3573a",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "ai-constraint-doc-generator/SKILL.md",
+                "mode": "preview",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "新标签页"
+              "title": "SKILL"
             }
           }
         ]
@@ -152,12 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "ai-constraint-doc-generator/SKILL.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "大纲"
+              "title": "SKILL 的大纲"
             }
           }
         ],
@@ -180,6 +185,31 @@
   },
   "active": "373d107877d3573a",
   "lastOpenFiles": [
+    "module-architecture-doc-generator/scripts/__pycache__/detect_architecture_modules.cpython-312.pyc",
+    "module-architecture-doc-generator/scripts/__pycache__",
+    "project-readme-generator/scripts/__pycache__/detect_readme_facts.cpython-312.pyc",
+    "project-readme-generator/scripts/__pycache__",
+    "module-architecture-doc-generator/scripts/detect_architecture_modules.py",
+    "module-architecture-doc-generator/agents/openai.yaml",
+    "module-architecture-doc-generator/references/evidence-and-quality.md",
+    "module-architecture-doc-generator/references/architecture-doc-model.md",
+    "module-architecture-doc-generator/references/module-discovery.md",
+    "module-architecture-doc-generator/scripts",
+    "module-architecture-doc-generator/references",
+    "module-architecture-doc-generator/agents",
+    "module-architecture-doc-generator/SKILL.md",
+    "module-architecture-doc-generator",
+    "project-readme-generator/scripts/detect_readme_facts.py",
+    "project-readme-generator/references/content-quality.md",
+    "project-readme-generator/references/command-verification.md",
+    "project-readme-generator/references/readme-model.md",
+    "project-readme-generator/SKILL.md",
+    "ai-constraint-doc-generator/references/verification-gate.md",
+    "ai-constraint-doc-generator/references/document-model.md",
+    "ai-constraint-doc-generator/references/languages/vue.md",
+    "ai-constraint-doc-generator/references/languages/python.md",
+    "ai-constraint-doc-generator/references/languages/java.md",
+    "ai-constraint-doc-generator/SKILL.md",
     "auto-plan-dev/SKILL.md",
     "requirement-doc-generator/SKILL.md",
     "sync-project-mcp/SKILL.md",
