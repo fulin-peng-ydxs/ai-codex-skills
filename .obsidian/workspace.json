@@ -185,6 +185,10 @@
   },
   "active": "373d107877d3573a",
   "lastOpenFiles": [
+    "agent-auto-commit-audit/agents/openai.yaml",
+    "agent-auto-commit-audit/agents",
+    "agent-auto-commit-audit/SKILL.md",
+    "agent-auto-commit-audit",
     "frontend-design/LICENSE.txt",
     "frontend-design/agents/openai.yaml",
     "frontend-design/agents",
@@ -197,9 +201,6 @@
     "frontend-reuse-enforcer/SKILL.md",
     "frontend-reuse-enforcer",
     "design-compliance-audit/references/compliance-checklist.md",
-    "design-compliance-audit/agents/openai.yaml",
-    "design-compliance-audit/references",
-    "design-compliance-audit/agents",
     "design-compliance-audit/SKILL.md",
     "page-ux-audit/references/audit-checklist.md",
     "page-ux-audit/SKILL.md",
@@ -219,7 +220,6 @@
     "ai-constraint-doc-generator/SKILL.md",
     "auto-plan-dev/SKILL.md",
     "requirement-doc-generator/SKILL.md",
-    "sync-project-mcp/SKILL.md",
-    "code-reviewer/SKILL.md"
+    "sync-project-mcp/SKILL.md"
   ]
 }

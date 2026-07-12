@@ -17,8 +17,9 @@
 | `ai-constraint-doc-generator` | 生成或重构项目级 AI 通用约束文档，包括 `AGENTS.md` 与 `CLAUDE.md`，并要求基于仓库事实和实际命令验证后再落地。 |
 | `ai-instruction-simplifier` | 精简、重构和规范 AI 约束文档、`DESIGN.md`、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束。 |
 | `ai-trend-knowledge-maintainer` | 维护 AI 趋势投资知识库，处理候选信息、正式文档、元数据和校验闭环。 |
+| `agent-auto-commit-audit` | 审查并修复 Agent-Auto 提交范围内的代码、业务闭环、页面体验和相关文档，并输出带引用依据的审查报告。 |
 | `auto-plan-dev` | 在用户明确点名 `auto-plan-dev` 时，根据需求文档和已存在的 HTML 原型生成可执行开发计划与任务编排清单，并在计划更新时同步记录真实落地结果、验证完成情况和页面组件资产闭环。 |
-| `automation-setup-assistant` | 创建、更新、验证和排查 Codex 自动化任务，包括权限、网络、Git push、定时执行异常。 |
+| `automation-setup-assistant` | 创建、更新、精简、验证和排查 Codex 自动化任务，包括提示词职责边界、权限、网络、Git push 和定时执行异常。 |
 | `backend-memory-risk-report` | 分析 Java/Spring 等后端代码中的内存溢出、泄漏和异常增长风险，并输出结构化检查报告。 |
 | `business-feature-audit` | 对当前改动做业务闭环核查，检查流程、状态、权限、上下游协同和数据一致性是否成立。 |
 | `code-reviewer` | 对本地改动或远程 PR 做代码审查，重点关注正确性、可维护性和规范一致性。 |
@@ -50,6 +51,8 @@
 11. 前端审查要按目标拆分：`page-ux-audit` 负责页面体验、交互直观性和控件必要性，`design-compliance-audit` 负责 `DESIGN.md` 等设计契约遵循，`frontend-reuse-enforcer` 负责重复实现、抽象边界和复用优先判断；不要把这三类问题混写成一个技能职责。
 12. `business-feature-audit` 只负责业务闭环、状态流转、上下游协同和前端业务承接，不替代页面 UX、DESIGN 合规或前端复用治理；涉及这些问题时应转交对应前端审查技能。
 13. 新建页面、落地页、仪表盘、组件视觉改造或其他需要显著提升界面辨识度的任务，可显式调用 `frontend-design` 获取更有个性的视觉方向、排版、配色、动效和文案指导；该技能聚焦设计表达，不替代业务闭环或代码复用审查。
+14. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-setup-assistant`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
+15. 需要按 Git 提交范围审查近期 AI 自动开发结果时，使用 `agent-auto-commit-audit`；它负责串联代码审查、业务闭环核查、页面审查、必要修复和文档同步，不替代单独的技能开发或常规提交消息生成。
 
 ## 编写建议
 
