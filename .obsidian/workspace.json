@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "2f4a83dd12186a14",
+        "id": "1e18f49124edb459",
         "type": "tabs",
         "children": [
           {
-            "id": "373d107877d3573a",
+            "id": "33bd7471b74c5bb9",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "ai-constraint-doc-generator/SKILL.md",
+                "file": "requirement-doc-generator/SKILL.md",
                 "mode": "preview",
                 "source": false
               },
@@ -156,7 +156,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "ai-constraint-doc-generator/SKILL.md",
+                "file": "requirement-doc-generator/SKILL.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -183,8 +183,11 @@
       "bases:新建数据库": false
     }
   },
-  "active": "373d107877d3573a",
+  "active": "33bd7471b74c5bb9",
   "lastOpenFiles": [
+    "未命名 1.base",
+    "未命名.base",
+    "ai-constraint-doc-generator/SKILL.md",
     "agent-auto-commit-audit/agents/openai.yaml",
     "agent-auto-commit-audit/agents",
     "agent-auto-commit-audit/SKILL.md",
@@ -197,9 +200,7 @@
     "frontend-reuse-enforcer/agents/openai.yaml",
     "frontend-reuse-enforcer/references/reuse-checklist.md",
     "frontend-reuse-enforcer/agents",
-    "frontend-reuse-enforcer/references",
     "frontend-reuse-enforcer/SKILL.md",
-    "frontend-reuse-enforcer",
     "design-compliance-audit/references/compliance-checklist.md",
     "design-compliance-audit/SKILL.md",
     "page-ux-audit/references/audit-checklist.md",
@@ -217,7 +218,6 @@
     "ai-constraint-doc-generator/references/languages/vue.md",
     "ai-constraint-doc-generator/references/languages/python.md",
     "ai-constraint-doc-generator/references/languages/java.md",
-    "ai-constraint-doc-generator/SKILL.md",
     "auto-plan-dev/SKILL.md",
     "requirement-doc-generator/SKILL.md",
     "sync-project-mcp/SKILL.md"
