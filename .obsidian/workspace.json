@@ -185,6 +185,8 @@
   },
   "active": "33bd7471b74c5bb9",
   "lastOpenFiles": [
+    "git-commit-msg/SKILL.md",
+    "git-commit-msg",
     "未命名 1.base",
     "未命名.base",
     "ai-constraint-doc-generator/SKILL.md",
@@ -197,9 +199,7 @@
     "frontend-design/agents",
     "frontend-design/SKILL.md",
     "frontend-design",
-    "frontend-reuse-enforcer/agents/openai.yaml",
     "frontend-reuse-enforcer/references/reuse-checklist.md",
-    "frontend-reuse-enforcer/agents",
     "frontend-reuse-enforcer/SKILL.md",
     "design-compliance-audit/references/compliance-checklist.md",
     "design-compliance-audit/SKILL.md",
