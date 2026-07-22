@@ -1,4 +1,4 @@
 interface:
   display_name: "达梦 MCP 创建器"
   short_description: "创建带安全保护的达梦数据库 MCP 服务"
-  default_prompt: "为当前项目创建一个达梦 DM 数据库 MCP 服务，包含受保护的读写工具，并注册到 Codex。"
+  default_prompt: "使用 $dm-mcp-creator 为当前项目创建并注册一个带独立密钥和可配置 SQL 安全策略的达梦 MCP 服务。"

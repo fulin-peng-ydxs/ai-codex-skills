@@ -12,13 +12,17 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class DmDbMcpServer {
     private static final String PROTOCOL_VERSION = "2024-11-05";
+    private static final List<String> SUPPORTED_QUERY_TYPES = Arrays.asList("SELECT", "WITH");
+    private static final List<String> SUPPORTED_WRITE_TYPES = Arrays.asList("INSERT", "UPDATE", "DELETE");
     private static Config config;
 
     public static void main(String[] args) throws Exception {
@@ -114,7 +118,8 @@ public class DmDbMcpServer {
         }
         if ("query_sql".equals(name)) {
             int limit = intValue(args.get("limit"), 200);
-            return textResult(Json.stringify(querySql(required(args, "sql"), Math.min(limit, 1000))));
+            int effectiveLimit = Math.min(Math.max(limit, 1), config.maxQueryRows);
+            return textResult(Json.stringify(querySql(required(args, "sql"), effectiveLimit)));
         }
         if ("execute_sql".equals(name)) {
             boolean dryRun = booleanValue(args.get("dry_run"), true);
@@ -129,10 +134,15 @@ public class DmDbMcpServer {
         tools.add(tool("list_tables", "List tables in the configured schema.", mapOf("type", "object", "properties", new LinkedHashMap<String, Object>())));
         tools.add(tool("describe_table", "Describe columns for a table in the configured schema.",
                 schemaWithProps(mapOf("table", prop("string", "Table name, without schema.")), new String[]{"table"})));
-        tools.add(tool("query_sql", "Run a read-only SELECT/WITH query. The result is capped.",
-                schemaWithProps(mapOf("sql", prop("string", "SELECT or WITH SQL."), "limit", prop("integer", "Max rows, up to 1000.")), new String[]{"sql"})));
-        tools.add(tool("execute_sql", "Dry-run or execute INSERT/UPDATE/DELETE. DDL is forbidden; UPDATE/DELETE require WHERE and are rolled back if affected rows exceed the configured limit.",
-                schemaWithProps(mapOf("sql", prop("string", "INSERT, UPDATE, or DELETE SQL."), "dry_run", prop("boolean", "Default true. Set false to execute.")), new String[]{"sql"})));
+        tools.add(tool("query_sql", "Run an allowed read-only query. Allowed statement types: "
+                        + String.join(", ", config.allowedQueryTypes) + "; result limit: " + config.maxQueryRows + ".",
+                schemaWithProps(mapOf("sql", prop("string", "Read-only SQL allowed by the configured profile policy."),
+                        "limit", prop("integer", "Requested rows; clamped to the configured profile limit.")), new String[]{"sql"})));
+        tools.add(tool("execute_sql", "Dry-run or execute SQL allowed by the profile policy. Allowed write statement types: "
+                        + String.join(", ", config.allowedWriteTypes) + "; forbidden keywords: "
+                        + String.join(", ", config.forbiddenSqlKeywords) + ".",
+                schemaWithProps(mapOf("sql", prop("string", "Write SQL allowed by the configured profile policy."),
+                        "dry_run", prop("boolean", "Default true. Set false to execute.")), new String[]{"sql"})));
         return tools;
     }
 
@@ -196,9 +206,10 @@ public class DmDbMcpServer {
 
     private static Object querySql(String sql, int limit) throws Exception {
         String normalized = normalizeSql(sql);
-        String upper = normalized.toUpperCase(Locale.ROOT);
-        if (!(upper.startsWith("SELECT ") || upper.startsWith("WITH "))) {
-            throw new IllegalArgumentException("query_sql only allows SELECT or WITH queries");
+        String type = statementType(normalized);
+        if (!config.allowedQueryTypes.contains(type)) {
+            throw new IllegalArgumentException("query_sql rejects statement type " + type
+                    + "; allowed types: " + String.join(", ", config.allowedQueryTypes));
         }
         rejectUnsafeSql(normalized, false);
         String limitedSql = "SELECT * FROM (" + normalized + ") WHERE ROWNUM <= " + limit;
@@ -212,13 +223,15 @@ public class DmDbMcpServer {
             throw new IllegalStateException("This MCP profile is read-only");
         }
         String normalized = normalizeSql(sql);
-        String upper = normalized.toUpperCase(Locale.ROOT);
+        String type = statementType(normalized);
         rejectUnsafeSql(normalized, true);
-        boolean updateOrDelete = upper.startsWith("UPDATE ") || upper.startsWith("DELETE ");
-        if (!(upper.startsWith("INSERT ") || updateOrDelete)) {
-            throw new IllegalArgumentException("execute_sql only allows INSERT, UPDATE, or DELETE");
+        if (!config.allowedWriteTypes.contains(type)) {
+            throw new IllegalArgumentException("execute_sql rejects statement type " + type
+                    + "; allowed types: " + String.join(", ", config.allowedWriteTypes));
         }
-        if (updateOrDelete && !upper.contains(" WHERE ")) {
+        boolean updateOrDelete = "UPDATE".equals(type) || "DELETE".equals(type);
+        if (config.requireWhere && updateOrDelete
+                && !containsSqlKeyword(sqlForPolicyCheck(normalized), "WHERE")) {
             throw new IllegalArgumentException("UPDATE/DELETE must include a WHERE clause");
         }
         if (dryRun) {
@@ -251,16 +264,109 @@ public class DmDbMcpServer {
     }
 
     private static void rejectUnsafeSql(String sql, boolean write) {
-        String upper = sql.toUpperCase(Locale.ROOT);
-        String[] forbidden = {"CREATE ", "ALTER ", "DROP ", "TRUNCATE ", "GRANT ", "REVOKE ", "MERGE ", "CALL ", "EXEC ", "COMMENT "};
-        for (String keyword : forbidden) {
-            if (upper.contains(keyword)) {
-                throw new IllegalArgumentException("Forbidden SQL keyword: " + keyword.trim());
+        String policySql = sqlForPolicyCheck(sql);
+        for (String keyword : config.forbiddenSqlKeywords) {
+            if (containsSqlKeyword(policySql, keyword)) {
+                throw new IllegalArgumentException("Forbidden SQL keyword: " + keyword);
             }
         }
-        if (!write && (upper.contains(" INSERT ") || upper.contains(" UPDATE ") || upper.contains(" DELETE "))) {
-            throw new IllegalArgumentException("Read-only query contains write keyword");
+        if (!write) {
+            for (String keyword : SUPPORTED_WRITE_TYPES) {
+                if (containsSqlKeyword(policySql, keyword)) {
+                    throw new IllegalArgumentException("Read-only query contains write keyword: " + keyword);
+                }
+            }
         }
+    }
+
+    /**
+     * 移除字符串、双引号标识符和注释中的内容，仅保留真正参与语句结构的字符。
+     * 返回值只用于安全策略判断，数据库实际执行的仍是规范化后的原始 SQL。
+     */
+    private static String sqlForPolicyCheck(String sql) {
+        StringBuilder out = new StringBuilder(sql.length());
+        boolean singleQuoted = false;
+        boolean doubleQuoted = false;
+        boolean lineComment = false;
+        boolean blockComment = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char current = sql.charAt(i);
+            char next = i + 1 < sql.length() ? sql.charAt(i + 1) : '\0';
+            if (lineComment) {
+                if (current == '\n' || current == '\r') {
+                    lineComment = false;
+                    out.append(' ');
+                }
+                continue;
+            }
+            if (blockComment) {
+                if (current == '*' && next == '/') {
+                    blockComment = false;
+                    i++;
+                }
+                out.append(' ');
+                continue;
+            }
+            if (singleQuoted) {
+                if (current == '\'' && next == '\'') {
+                    i++;
+                } else if (current == '\'') {
+                    singleQuoted = false;
+                }
+                out.append(' ');
+                continue;
+            }
+            if (doubleQuoted) {
+                if (current == '"' && next == '"') {
+                    i++;
+                } else if (current == '"') {
+                    doubleQuoted = false;
+                }
+                out.append(' ');
+                continue;
+            }
+            if (current == '-' && next == '-') {
+                lineComment = true;
+                i++;
+                out.append(' ');
+            } else if (current == '/' && next == '*') {
+                blockComment = true;
+                i++;
+                out.append(' ');
+            } else if (current == '\'') {
+                singleQuoted = true;
+                out.append(' ');
+            } else if (current == '"') {
+                doubleQuoted = true;
+                out.append(' ');
+            } else {
+                out.append(Character.toUpperCase(current));
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * 按完整 SQL 单词匹配已经清洗的策略文本，避免表名或字段名包含短字符串时被误判。
+     */
+    private static boolean containsSqlKeyword(String policySql, String keyword) {
+        String regex = "(^|[^A-Z0-9_])" + Pattern.quote(keyword) + "([^A-Z0-9_]|$)";
+        return Pattern.compile(regex).matcher(policySql).find();
+    }
+
+    /**
+     * 提取首个 SQL 操作关键字作为语句类型；不接受以注释或其他特殊字符开头的隐式语句。
+     */
+    private static String statementType(String sql) {
+        String upper = sql.trim().toUpperCase(Locale.ROOT);
+        int end = 0;
+        while (end < upper.length() && Character.isLetter(upper.charAt(end))) {
+            end++;
+        }
+        if (end == 0) {
+            throw new IllegalArgumentException("Unable to determine SQL statement type");
+        }
+        return upper.substring(0, end);
     }
 
     private static String normalizeSql(String sql) {
@@ -368,8 +474,16 @@ public class DmDbMcpServer {
         final String passwordEnv;
         final boolean writable;
         final int maxAffectedRows;
+        final int maxQueryRows;
+        final boolean requireWhere;
+        final List<String> allowedQueryTypes;
+        final List<String> allowedWriteTypes;
+        final List<String> forbiddenSqlKeywords;
 
-        private Config(String host, String port, String schema, String user, String passwordEnv, boolean writable, int maxAffectedRows) {
+        private Config(String host, String port, String schema, String user, String passwordEnv,
+                       boolean writable, int maxAffectedRows, int maxQueryRows, boolean requireWhere,
+                       List<String> allowedQueryTypes, List<String> allowedWriteTypes,
+                       List<String> forbiddenSqlKeywords) {
             this.host = host;
             this.port = port;
             this.schema = schema.toUpperCase(Locale.ROOT);
@@ -377,6 +491,11 @@ public class DmDbMcpServer {
             this.passwordEnv = passwordEnv;
             this.writable = writable;
             this.maxAffectedRows = maxAffectedRows;
+            this.maxQueryRows = maxQueryRows;
+            this.requireWhere = requireWhere;
+            this.allowedQueryTypes = allowedQueryTypes;
+            this.allowedWriteTypes = allowedWriteTypes;
+            this.forbiddenSqlKeywords = forbiddenSqlKeywords;
         }
 
         static Config fromEnv() {
@@ -386,8 +505,57 @@ public class DmDbMcpServer {
                     env("DM_MCP_SCHEMA", "DM_SCHEMA"),
                     env("DM_MCP_USER", "DM_USER"),
                     env("DM_MCP_PASSWORD_ENV", "DM_PASSWORD"),
-                    Boolean.parseBoolean(env("DM_MCP_WRITABLE", "true")),
-                    Integer.parseInt(env("DM_MCP_MAX_AFFECTED_ROWS", "1000")));
+                    booleanEnv("DM_MCP_WRITABLE", false),
+                    positiveIntEnv("DM_MCP_MAX_AFFECTED_ROWS", 1000),
+                    positiveIntEnv("DM_MCP_MAX_QUERY_ROWS", 1000),
+                    booleanEnv("DM_MCP_REQUIRE_WHERE", true),
+                    allowedSqlTypes("DM_MCP_ALLOWED_QUERY_TYPES", "SELECT,WITH", SUPPORTED_QUERY_TYPES),
+                    allowedSqlTypes("DM_MCP_ALLOWED_WRITE_TYPES", "INSERT,UPDATE,DELETE", SUPPORTED_WRITE_TYPES),
+                    csvEnv("DM_MCP_FORBIDDEN_SQL_KEYWORDS",
+                            "CREATE,ALTER,DROP,TRUNCATE,GRANT,REVOKE,MERGE,CALL,EXEC,COMMENT"));
+        }
+
+        private static boolean booleanEnv(String key, boolean fallback) {
+            String value = env(key, String.valueOf(fallback)).trim().toLowerCase(Locale.ROOT);
+            if (!"true".equals(value) && !"false".equals(value)) {
+                throw new IllegalArgumentException(key + " must be true or false");
+            }
+            return Boolean.parseBoolean(value);
+        }
+
+        private static int positiveIntEnv(String key, int fallback) {
+            int value = Integer.parseInt(env(key, String.valueOf(fallback)));
+            if (value <= 0) {
+                throw new IllegalArgumentException(key + " must be greater than zero");
+            }
+            return value;
+        }
+
+        private static List<String> allowedSqlTypes(String key, String fallback, List<String> supported) {
+            List<String> configured = csvEnv(key, fallback);
+            for (String value : configured) {
+                if (!supported.contains(value)) {
+                    throw new IllegalArgumentException(key + " contains unsupported SQL type: " + value);
+                }
+            }
+            return configured;
+        }
+
+        private static List<String> csvEnv(String key, String fallback) {
+            List<String> values = new ArrayList<>();
+            for (String item : env(key, fallback).split(",")) {
+                String value = item.trim().toUpperCase(Locale.ROOT);
+                if (!value.matches("[A-Z_]+")) {
+                    throw new IllegalArgumentException(key + " contains an invalid value: " + item);
+                }
+                if (!values.contains(value)) {
+                    values.add(value);
+                }
+            }
+            if (values.isEmpty()) {
+                throw new IllegalArgumentException(key + " must not be empty");
+            }
+            return values;
         }
 
         private static String env(String key, String fallback) {
