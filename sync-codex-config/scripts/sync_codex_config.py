@@ -24,7 +24,6 @@ IGNORED_NAMES = {
     "node_modules",
 }
 
-
 class SyncError(RuntimeError):
     """Raised when synchronization cannot continue safely."""
 
@@ -133,16 +132,50 @@ def has_skill_frontmatter(path: Path) -> bool:
         return False
 
 
-def discover_skills(skills_root: Path) -> list[Path]:
+def read_skill_frontmatter(path: Path) -> str:
+    skill_file = path if path.is_file() else path / "SKILL.md"
+    try:
+        with skill_file.open("r", encoding="utf-8") as handle:
+            if handle.readline().strip() != "---":
+                return ""
+            lines: list[str] = []
+            for line in handle:
+                if line.strip() == "---":
+                    return "".join(lines)
+                lines.append(line)
+    except (OSError, UnicodeError):
+        return ""
+    return ""
+
+
+def is_excluded_mcp_skill(path: Path) -> bool:
+    """Return whether a skill is identified as MCP-related."""
+    identity = f"{path.stem if path.is_file() else path.name}\n{read_skill_frontmatter(path)}"
+    return "mcp" in identity.casefold()
+
+
+def discover_skills(skills_root: Path) -> tuple[list[Path], list[Path]]:
     skills: list[Path] = []
+    excluded_skills: list[Path] = []
     for entry in sorted(skills_root.iterdir(), key=lambda item: item.name):
         if entry.name.startswith(".") or entry.name in IGNORED_NAMES:
             continue
-        if entry.is_dir() and not entry.is_symlink() and (entry / "SKILL.md").is_file():
+        is_skill = (
+            entry.is_dir()
+            and not entry.is_symlink()
+            and (entry / "SKILL.md").is_file()
+        ) or (
+            entry.is_file()
+            and entry.suffix.lower() == ".md"
+            and has_skill_frontmatter(entry)
+        )
+        if not is_skill:
+            continue
+        if is_excluded_mcp_skill(entry):
+            excluded_skills.append(entry)
+        else:
             skills.append(entry)
-        elif entry.is_file() and entry.suffix.lower() == ".md" and has_skill_frontmatter(entry):
-            skills.append(entry)
-    return skills
+    return skills, excluded_skills
 
 
 def destination_kind_conflicts(source: Path, destination: Path) -> bool:
@@ -241,7 +274,7 @@ def main() -> int:
         validate_paths(args.codex_root, targets)
         source_skills_root = args.codex_root / "skills"
         source_agents = args.codex_root / "AGENTS.md"
-        skills = discover_skills(source_skills_root)
+        skills, excluded_skills = discover_skills(source_skills_root)
         if not skills:
             raise SyncError(f"未发现可同步技能：{source_skills_root}")
 
@@ -249,6 +282,9 @@ def main() -> int:
         print(f"模式：{mode}")
         print(f"Codex 源：{args.codex_root}")
         print(f"发现技能：{len(skills)}")
+        if excluded_skills:
+            excluded_names = "、".join(skill.name for skill in excluded_skills)
+            print(f"排除 MCP 相关技能：{len(excluded_skills)}（{excluded_names}）")
 
         for label, target_root in targets:
             skill_counts = Counts()

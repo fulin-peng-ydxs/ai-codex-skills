@@ -1,6 +1,6 @@
 ---
 name: sync-project-mcp
-description: 检测当前项目 .codex-mcp 目录和 .mcp.json 中声明的本地 MCP 服务，对比 Codex 的 ~/.codex/config.toml 中 mcp_servers 注册项，自动注册缺失的项目 MCP，并通过 JSON-RPC initialize/tools-list 握手验证每个项目 MCP，最后用中文输出当前项目 MCP 列表。适用于用户要求同步、注册、检测、验证、列出或修复当前项目 Codex MCP 注册的场景。
+description: 检测当前项目 .codex-mcp 目录和 .mcp.json 中声明的本地 MCP 服务，将 command、args、env、env_vars、cwd 等启动参数同步到 Codex config.toml，注册缺失项、更新参数不一致的已有项，并通过 JSON-RPC 握手验证。适用于用户要求同步、注册、检测、验证、列出或修复当前项目 Codex MCP 注册及环境参数的场景。
 ---
 
 # 同步项目 MCP
@@ -21,18 +21,21 @@ python3 "$HOME/.codex/skills/sync-project-mcp/scripts/sync_project_mcp.py" --pro
 
 脚本必须完成以下动作：
 
-1. 从 `.mcp.json` 的 `mcpServers` 和 `.codex-mcp/*/run.sh` 发现项目 MCP 候选项。
+1. 从 `.mcp.json` 的 `mcpServers` 和 `.codex-mcp/*/run.sh` 发现项目 MCP 候选项；同一命令以 `.mcp.json` 为权威来源。
 2. 从 `${CODEX_HOME:-$HOME/.codex}/config.toml` 的 `[mcp_servers.<name>]` 读取 Codex 已注册 MCP。
-3. 如果某个 MCP 的解析后 `command` 路径已经存在于 Codex 配置中，即使注册名不同，也视为已注册。
-4. 对缺失的 MCP 追加注册到 Codex 配置；优先使用 `.mcp.json` 中的服务名。如果该名称已被其他命令占用，使用 `<项目目录名>-<服务名>`。
-5. 启动每个项目 MCP 命令，通过 stdio 发送 JSON-RPC `initialize` 和 `tools/list` 请求进行验证。
-6. 用中文报告已存在、新增注册、验证失败和跳过项。
+3. 从 `.mcp.json` 同步 `command`、`args`、`env`、`env_vars`、`cwd` 和 `experimental_environment`，不得只根据 `command` 判定同步完成。
+4. 优先按同名且同命令匹配，再按解析后的命令匹配；已有注册缺少参数或参数不一致时，更新该 MCP 配置块并保留其余 Codex 专用选项。
+5. 对缺失的 MCP 追加注册；优先使用 `.mcp.json` 中的服务名。名称被其他命令占用时，使用 `<项目目录名>-<服务名>`。
+6. 使用同步后的命令、参数、工作目录和环境变量启动 MCP，通过 stdio 发送 JSON-RPC `initialize` 和 `tools/list` 请求进行验证。
+7. 用中文报告已存在、新增注册、参数更新、验证失败和跳过项；不得输出环境变量值。
 
 ## 安全要求
 
 - 修改 `config.toml` 前必须创建带时间戳的备份。
-- 不删除、不重写无关 MCP 注册。
-- 保留现有配置文本，只在文件末尾追加新的 `[mcp_servers.<name>]` 配置块。
+- 不删除、不重写无关 MCP 注册；更新仅限匹配到的项目 MCP 配置块。
+- `.mcp.json` 中的 STDIO 启动参数是项目 MCP 的权威配置，Codex 独有的超时、启停和工具审批等选项应保留。
+- 新增注册追加到文件末尾；参数变化时原位替换对应 MCP 配置块。
+- 报告仅显示参数数量，不显示 `env` 的值。
 - 如果验证失败，保留注册项，但清楚报告 MCP 名称、命令路径和错误原因，方便用户修复环境变量或依赖。
 - 如果项目 MCP 都已经注册，明确说明“没有需要注册的 MCP”，并列出当前项目 MCP 注册列表。
 
