@@ -34,8 +34,8 @@
 | `project-design-md-generator` | 为前端项目生成或更新 `DESIGN.md`，沉淀 UI 规范、设计约束和复用规则。 |
 | `project-readme-generator` | 基于仓库事实和实际命令验证生成、重构或优化项目 `README.md`。 |
 | `requirement-closure-designer` | 先补全需求在系统中的完整功能闭环、页面入口、角色链路和状态流转，并为“建议实现”标注处理状态，再决定是否进入正式需求文档编写。 |
-| `requirement-doc-generator` | 基于已确认的需求闭环和项目现状生成正式 `requirement.md`；新增页面需配套 `prototypes/` 下的 HTML 原型，页面条目需识别通用前端能力和配置化承载诉求，建议实现和优化项必须带处理状态，落地前先向用户确认。 |
-| `sync-codex-config` | 将 Codex 全局 skills 与 `AGENTS.md` 同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 |
+| `requirement-doc-generator` | 基于已确认的需求闭环和项目现状生成正式 `requirement.md`；执行时按阶段读取闭环一致性契约、文档模板和原型规则，新增页面需配套 `prototypes/` 下的 HTML 原型，建议实现和优化项必须带处理状态，交付前要运行结构校验脚本并保留人工语义复核。 |
+| `sync-codex-config` | 将 Codex 全局 skills 与协作说明同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步；Claude 目标文档为 `CLAUDE.md`、Kimi 目标文档为 `AGENTS.md`，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 |
 | `sync-project-mcp` | 将项目 `.mcp.json` 与 `.codex-mcp` 中声明的 MCP 启动参数同步到 Codex 本地注册信息，并做握手验证。 |
 
 ## 使用方式
@@ -57,7 +57,7 @@
 15. 需要按 Git 提交范围审查近期 AI 自动开发结果时，使用 `agent-auto-commit-audit`；它负责串联代码审查、业务闭环核查、页面审查、必要修复和文档同步，不替代单独的技能开发或常规提交消息生成。
 16. 涉及 Git 提交文案生成时，使用 `git-commit-msg`；它只负责基于已确认范围输出提交消息，不负责执行 `git add`、`git commit` 或 `git push`，且确认步骤必须使用当前环境自带的交互式提问工具，工具不可用时应中止而不是退回纯文本提问。
 17. 需要实际执行 Git 提交与推送时，使用 `git-push`；它负责在当前环境下完成文件范围确认、提交文案确认、staged 清单复核和最终推送，不替代单独的提交消息生成规范；若当前环境缺少可用的交互式提问工具，也必须中止流程而不是改用普通文字确认。
-18. 需要把 Codex 的全局 skills 或 `AGENTS.md` 对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
+18. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
 
 ## 编写建议
 
@@ -70,7 +70,7 @@
 - 若 Git 提交流程类技能新增了稳定的确认节点、交互式提问工具依赖、staged 校验或 push 安全约束，也要同步检查 README 是否已准确反映职责分工。
 - 若新增跨工具同步类技能，README 需写清源目录、目标目录、是否先预览、是否覆盖文档、是否保留目标端独有文件，以及是否排除某类技能，避免把一次性复制流程误写成删除式镜像。
 - 若 MCP 同步类技能新增或调整启动参数同步规则、命令匹配优先级、配置块更新策略或报告脱敏要求，也要同步检查 README 是否已准确反映这些维护约束。
-- 对以需求文档为输入的技能，若新增或调整 `prototypes/`、README、脚本等关键依赖，也要同步检查 README 是否已写清资源职责和先后关系。
+- 对以需求文档为输入的技能，若新增或调整闭环一致性契约、`requirement-template.md`、`prototype-rules.md`、`prototypes/`、README 或校验脚本等关键依赖，也要同步检查 README 是否已写清资源职责和先后关系。
 - 若需求闭环、需求文档或开发计划技能新增了稳定状态枚举、范围映射、原型约束、组件资产闭环或是否纳入的约束，也要同步检查 README 是否已写清这些维护规则。
 - 若 AI 约束文档、项目 README 或模块架构文档类技能新增了稳定的命令验证门禁、输出目录规则、薄入口职责分离或文档索引约束，也要同步检查 README 是否已准确反映这些规则。
 

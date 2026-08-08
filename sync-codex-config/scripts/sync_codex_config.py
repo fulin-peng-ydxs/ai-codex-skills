@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize Codex user skills and AGENTS.md to Claude and Kimi."""
+"""Synchronize Codex user skills and collaboration instructions to Claude and Kimi."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ def default_root(primary_env: str, fallback: str, secondary_env: str | None = No
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="将 Codex 全局技能和 AGENTS.md 更新到 Claude、Kimi 用户目录。"
+        description="将 Codex 全局技能和协作说明更新到 Claude、Kimi 用户目录。"
     )
     parser.add_argument(
         "--target",
@@ -244,7 +244,7 @@ def sync_document(source: Path, destination: Path, dry_run: bool) -> str:
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     file_descriptor, temporary_name = tempfile.mkstemp(
-        prefix=".AGENTS.md.", dir=destination.parent
+        prefix=f".{destination.name}.", dir=destination.parent
     )
     temporary_path = Path(temporary_name)
     try:
@@ -265,6 +265,12 @@ def selected_targets(args: argparse.Namespace) -> list[tuple[str, Path]]:
     if args.target in ("all", "kimi"):
         targets.append(("Kimi", args.kimi_root))
     return targets
+
+
+def target_document_name(label: str) -> str:
+    if label == "Claude":
+        return "CLAUDE.md"
+    return "AGENTS.md"
 
 
 def main() -> int:
@@ -298,13 +304,14 @@ def main() -> int:
                     skill_counts.updated += 1
                 else:
                     skill_counts.unchanged += 1
+            document_name = target_document_name(label)
             document_status = sync_document(
-                source_agents, target_root / "AGENTS.md", args.dry_run
+                source_agents, target_root / document_name, args.dry_run
             )
             print(
                 f"{label}：{target_root} | "
                 f"技能新增 {skill_counts.created}、更新 {skill_counts.updated}、"
-                f"未变化 {skill_counts.unchanged} | AGENTS.md {document_status}"
+                f"未变化 {skill_counts.unchanged} | {document_name} {document_status}"
             )
         return 0
     except (OSError, SyncError) as error:
