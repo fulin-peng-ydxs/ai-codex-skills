@@ -34,6 +34,7 @@
 | `module-architecture-doc-generator` | 基于代码和现有文档按模块生成或更新架构文档，并同步 README/AGENTS 的文档入口。 |
 | `page-ux-audit` | 审查页面视觉一致性、交互直观性、控件必要性和状态细节，聚焦页面体验与交付质量。 |
 | `project-design-md-generator` | 为前端项目生成或更新 `DESIGN.md`，沉淀 UI 规范、设计约束和复用规则。 |
+| `project-handover-analyzer` | 基于完整项目或多仓交付包的源码、配置、构建和部署材料，按稳定的 14 章骨架生成可复核的接手分析报告，覆盖总体功能、技术与部署架构、模块依赖、交付完整性、典型调用链、风险和接手路线。 |
 | `project-readme-generator` | 基于仓库事实和实际命令验证生成、重构或优化项目 `README.md`。 |
 | `requirement-closure-designer` | 先补全需求在系统中的完整功能闭环、页面入口、角色链路和状态流转，并为“建议实现”标注处理状态，再决定是否进入正式需求文档编写。 |
 | `requirement-doc-generator` | 基于已确认的需求闭环和项目现状生成正式 `requirement.md`；执行时按阶段读取闭环一致性契约、文档模板和原型规则，新增页面需配套 `prototypes/` 下的 HTML 原型，建议实现和优化项必须带处理状态，交付前要运行结构校验脚本并保留人工语义复核。 |
@@ -62,6 +63,7 @@
 18. 涉及 Git 提交文案生成时，使用 `git-commit-msg`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-msg` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
 19. 需要实际执行 Git 提交与推送时，使用 `git-push`；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
 20. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
+21. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analyzer`；它默认按稳定的 14 章骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `module-architecture-doc-generator`，单项已实现业务闭环继续使用 `business-closed-loop-flow-analyzer`。
 
 ## 编写建议
 
@@ -80,6 +82,7 @@
 - 对以需求文档为输入的技能，若新增或调整闭环一致性契约、`requirement-template.md`、`prototype-rules.md`、`prototypes/`、README 或校验脚本等关键依赖，也要同步检查 README 是否已写清资源职责和先后关系。
 - 若需求闭环、需求文档或开发计划技能新增了稳定状态枚举、范围映射、原型约束、前端组件与配置接入闭环或是否纳入的约束，也要同步检查 README 是否已写清这些维护规则。
 - 若 AI 约束文档、项目 README 或模块架构文档类技能新增了稳定的命令验证门禁、输出目录规则、薄入口职责分离或文档索引约束，也要同步检查 README 是否已准确反映这些规则。
+- 若项目接手分析类技能调整默认章节骨架、证据与完整性门禁、扫描分类或报告模板，必须同步核对入口文件、参考资料、模板、扫描脚本和测试的一致性，并检查 README 的用途与相邻技能边界。
 
 ## 备注
 
