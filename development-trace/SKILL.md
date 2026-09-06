@@ -1,6 +1,6 @@
 ---
 name: development-trace
-description: 为当前会话或当前 Git 工作区中的业务代码改动生成开发留痕文档。适用于用户要求“开发留痕”“生成 agent-works 文档”“按功能需求总结本次改动”“根据改动文件和开发计划输出实施记录”等场景；输出 Markdown 到项目根目录 ./agent-works/{feature-slug}/development-trace.md，按功能需求拆分，一项功能一个目录，并优先复用同一功能已有的 agent-works 目录以保持 development-trace.md、business-audit.md 等文档归档一致。
+description: 为当前会话或当前 Git 工作区中的业务代码改动生成开发留痕文档。仅当用户显式调用 `$development-trace` 时使用，不得根据代码改动、开发完成、文档需求或相似语义自动调用；输出 Markdown 到项目根目录 ./agent-works/{feature-slug}/development-trace.md，按功能需求拆分，一项功能一个目录，并优先复用同一功能已有的 agent-works 目录以保持 development-trace.md、business-audit.md 等文档归档一致。
 ---
 
 # Development Trace
@@ -9,7 +9,9 @@ description: 为当前会话或当前 Git 工作区中的业务代码改动生�
 
 ## 适用范围
 
-在以下场景使用本技能：
+本技能仅允许由用户显式调用 `$development-trace`。即使当前任务已完成代码开发、存在 Git 改动、需要补充相关文档，或用户使用“开发留痕”等相似语义但未显式调用该技能，也不得自动启用或建议捆绑执行。
+
+用户显式调用后，可处理以下场景：
 
 - 用户要求对当前会话改动、当前 Git 改动或指定文件做开发留痕。
 - 用户要求根据开发计划、需求文档、实现代码生成 `agent-works` 下的说明文档。
