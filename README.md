@@ -14,7 +14,7 @@
 
 | 技能目录 | 主要用途 |
 | --- | --- |
-| `ai-constraint-doc-generator` | 生成或重构项目级 AI 通用约束文档，包括 `AGENTS.md` 与 `CLAUDE.md`，并要求基于仓库事实和实际命令验证后再落地。 |
+| `ai-constraint-doc-generator` | 按固定章节和最低内容契约生成或重构项目级 `AGENTS.md` 与薄入口 `CLAUDE.md`，要求基于仓库事实、实际命令验证和结构校验后再落地。 |
 | `ai-instruction-simplifier` | 精简、重构和规范 AI 约束文档、`DESIGN.md`、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束。 |
 | `ai-trend-knowledge-maintainer` | 维护 AI 趋势投资知识库，处理候选信息、正式文档、元数据和校验闭环。 |
 | `agent-auto-commit-audit` | 审查并修复 Agent-Auto 提交范围内的代码、业务闭环、页面体验和相关文档，并输出带引用依据的审查报告。 |
@@ -35,7 +35,7 @@
 | `page-ux-audit` | 审查页面视觉一致性、交互直观性、控件必要性和状态细节，聚焦页面体验与交付质量。 |
 | `project-design-md-generator` | 为前端项目生成或更新 `DESIGN.md`，沉淀 UI 规范、设计约束和复用规则。 |
 | `project-handover-analyzer` | 基于完整项目或多仓交付包的源码、配置、构建和部署材料，按稳定的 14 章骨架生成可复核的接手分析报告，覆盖总体功能、技术与部署架构、模块依赖、交付完整性、典型调用链、风险和接手路线。 |
-| `project-readme-generator` | 基于仓库事实和实际命令验证生成、重构或优化项目 `README.md`。 |
+| `project-readme-generator` | 基于仓库事实和实际命令验证，按固定核心章节、条件章节槽位和结构校验生成、重构或优化项目 `README.md`。 |
 | `requirement-closure-designer` | 先补全需求在系统中的完整功能闭环、页面入口、角色链路和状态流转，并为“建议实现”标注处理状态，再决定是否进入正式需求文档编写。 |
 | `requirement-doc-generator` | 基于已确认的需求闭环和项目现状生成正式 `requirement.md`；独立说明可追溯、可验收的性能与安全目标，不越界指定开发实现；页面原型需在落地前确认，建议项需标明处理状态，写入前完成人工语义复核。 |
 | `sync-codex-config` | 将 Codex 全局 skills 与协作说明同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步；Claude 目标文档为 `CLAUDE.md`、Kimi 目标文档为 `AGENTS.md`，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 |
