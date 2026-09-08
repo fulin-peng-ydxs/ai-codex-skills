@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the stable README heading contract."""
+"""Validate the stable module architecture document heading contract."""
 
 from __future__ import annotations
 
@@ -11,38 +11,28 @@ from pathlib import Path
 
 SECTIONS = {
     "zh": [
-        ("项目概览", True),
-        ("核心能力与适用边界", True),
-        ("快速开始", True),
-        ("使用说明", True),
-        ("API 与 CLI", False),
-        ("架构与代码结构", False),
-        ("配置与环境变量", False),
-        ("数据准备与迁移", False),
-        ("开发与验证", True),
-        ("部署与运维", False),
-        ("故障排查", False),
-        ("兼容性", False),
-        ("文档导航", True),
-        ("贡献指南", False),
-        ("许可证与引用", False),
+        "文档范围与结论摘要",
+        "模块定位与职责边界",
+        "核心技术与实现机制",
+        "架构组成与调用关系",
+        "使用与运行方式",
+        "核心流程与状态变化",
+        "数据、权限与配置",
+        "上下游依赖与影响范围",
+        "验证与测试入口",
+        "风险、限制与待确认项",
     ],
     "en": [
-        ("Overview", True),
-        ("Capabilities and Scope", True),
-        ("Quick Start", True),
-        ("Usage", True),
-        ("API and CLI", False),
-        ("Architecture and Code Structure", False),
-        ("Configuration and Environment Variables", False),
-        ("Data Preparation and Migrations", False),
-        ("Development and Verification", True),
-        ("Deployment and Operations", False),
-        ("Troubleshooting", False),
-        ("Compatibility", False),
-        ("Documentation", True),
-        ("Contributing", False),
-        ("License and Attribution", False),
+        "Document Scope and Summary",
+        "Module Purpose and Responsibility Boundaries",
+        "Core Technologies and Implementation Mechanisms",
+        "Architecture Components and Call Relationships",
+        "Usage and Runtime Operations",
+        "Core Flows and State Changes",
+        "Data, Permissions, and Configuration",
+        "Upstream and Downstream Dependencies",
+        "Verification and Test Entry Points",
+        "Risks, Limitations, and Open Questions",
     ],
 }
 
@@ -95,15 +85,6 @@ def parse_sections(text: str) -> tuple[list[str], list[tuple[str, str]]]:
     return h1, [(title, "\n".join(body).strip()) for title, body in sections]
 
 
-def detect_language(titles: list[str]) -> str | None:
-    scores = {
-        language: sum(title in {name for name, _ in sections} for title in titles)
-        for language, sections in SECTIONS.items()
-    }
-    best = max(scores, key=scores.get)
-    return best if scores[best] else None
-
-
 def has_content(body: str) -> bool:
     return any(
         line.strip() and (kind == "code" or not line.strip().startswith("#"))
@@ -114,6 +95,15 @@ def has_content(body: str) -> bool:
 
 def prose_without_fences(body: str) -> str:
     return "\n".join(line for line, kind in fenced_lines(body) if kind == "prose")
+
+
+def detect_language(titles: list[str]) -> str | None:
+    scores = {
+        language: sum(title in set(sections) for title in titles)
+        for language, sections in SECTIONS.items()
+    }
+    best = max(scores, key=scores.get)
+    return best if scores[best] else None
 
 
 def validate(text: str, language: str, custom_structure: bool = False) -> list[str]:
@@ -138,14 +128,16 @@ def validate(text: str, language: str, custom_structure: bool = False) -> list[s
 
     selected_language = detect_language(titles) if language == "auto" else language
     if selected_language is None:
-        errors.append("could not detect README contract language")
+        errors.append("could not detect architecture document contract language")
         return errors
 
-    contract = SECTIONS[selected_language]
-    allowed = [name for name, _ in contract]
-    required = [name for name, is_required in contract if is_required]
+    if h1:
+        expected_suffix = "模块架构" if selected_language == "zh" else "Module Architecture"
+        if not h1[0].endswith(expected_suffix):
+            errors.append(f"level-1 title must end with '{expected_suffix}'")
 
-    for title in required:
+    expected = SECTIONS[selected_language]
+    for title in expected:
         count = titles.count(title)
         if count != 1:
             errors.append(f"required section '{title}' must appear once, found {count}")
@@ -153,15 +145,15 @@ def validate(text: str, language: str, custom_structure: bool = False) -> list[s
     for title in sorted({title for title in titles if titles.count(title) > 1}):
         errors.append(f"duplicate level-2 section: '{title}'")
 
-    for title in [title for title in titles if title not in allowed]:
+    for title in [title for title in titles if title not in expected]:
         errors.append(f"unexpected level-2 section: '{title}'")
 
-    ordered = [title for title in titles if title in allowed]
-    if ordered != sorted(ordered, key=allowed.index):
+    ordered = [title for title in titles if title in expected]
+    if ordered != expected:
         errors.append("level-2 sections do not follow the contract order")
 
     for title, body in sections:
-        if title in allowed and not has_content(body):
+        if title in expected and not has_content(body):
             errors.append(f"section '{title}' is empty")
         if PLACEHOLDER_RE.search(prose_without_fences(body)):
             errors.append(f"section '{title}' contains placeholder content")
@@ -184,50 +176,65 @@ def self_test() -> int:
     if has_content("```\n```") or prose_without_fences("```\ncode\n```\nTODO: prose") != "TODO: prose":
         print("self-test failed: fence boundary misclassified", file=sys.stderr)
         return 1
-    valid_zh = """# Demo
+    valid_zh = """# 示例模块架构
 
-定位。
-
-## 项目概览
-概览。
-## 核心能力与适用边界
-能力。
-## 快速开始
-步骤。
-## 使用说明
-说明。
-## 开发与验证
+## 文档范围与结论摘要
+范围。
+## 模块定位与职责边界
+边界。
+## 核心技术与实现机制
+机制。
+## 架构组成与调用关系
+关系。
+## 使用与运行方式
+使用。
+## 核心流程与状态变化
+流程。
+## 数据、权限与配置
+数据。
+## 上下游依赖与影响范围
+依赖。
+## 验证与测试入口
 验证。
-## 文档导航
-导航。
+## 风险、限制与待确认项
+风险。
 """
-    valid_en = """# Demo
+    valid_en = """# Example Module Architecture
 
-Purpose.
-
-## Overview
-Overview.
-## Capabilities and Scope
-Capabilities.
-## Quick Start
-Steps.
-## Usage
+## Document Scope and Summary
+Scope.
+## Module Purpose and Responsibility Boundaries
+Boundaries.
+## Core Technologies and Implementation Mechanisms
+Mechanisms.
+## Architecture Components and Call Relationships
+Relationships.
+## Usage and Runtime Operations
 Usage.
-## Development and Verification
+## Core Flows and State Changes
+Flows.
+## Data, Permissions, and Configuration
+Data.
+## Upstream and Downstream Dependencies
+Dependencies.
+## Verification and Test Entry Points
 Verification.
-## Documentation
-Documentation.
+## Risks, Limitations, and Open Questions
+Risks.
 """
-    invalid_missing = valid_zh.replace("## 快速开始\n步骤。\n", "")
+    invalid_missing = valid_zh.replace("## 核心流程与状态变化\n流程。\n", "")
     invalid_order = valid_zh.replace(
-        "## 项目概览\n概览。\n## 核心能力与适用边界\n能力。",
-        "## 核心能力与适用边界\n能力。\n## 项目概览\n概览。",
+        "## 文档范围与结论摘要\n范围。\n## 模块定位与职责边界\n边界。",
+        "## 模块定位与职责边界\n边界。\n## 文档范围与结论摘要\n范围。",
     )
     if validate(valid_zh, "zh") or validate(valid_en, "en"):
         print("self-test failed: valid fixture rejected", file=sys.stderr)
         return 1
     if not validate(invalid_missing, "zh") or not validate(invalid_order, "zh"):
         print("self-test failed: invalid fixture accepted", file=sys.stderr)
+        return 1
+    if not validate(valid_zh.replace("# 示例模块架构", "# 示例模块"), "zh"):
+        print("self-test failed: invalid level-1 title accepted", file=sys.stderr)
         return 1
     if validate("# Custom\n\n## Custom Section\nContent.\n", "auto", True):
         print("self-test failed: valid custom fixture rejected", file=sys.stderr)
@@ -238,7 +245,7 @@ Documentation.
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("path", nargs="?", help="README path")
+    parser.add_argument("path", nargs="?", help="module architecture document path")
     parser.add_argument("--language", choices=("auto", "zh", "en"), default="auto")
     parser.add_argument("--custom-structure", action="store_true")
     parser.add_argument("--self-test", action="store_true")
@@ -258,7 +265,7 @@ def main() -> int:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
-    print(f"README structure valid: {path}")
+    print(f"Module architecture document structure valid: {path}")
     return 0
 
 

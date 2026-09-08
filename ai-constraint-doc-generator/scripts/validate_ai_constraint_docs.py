@@ -48,20 +48,31 @@ SHELL_FENCE_RE = re.compile(
 )
 
 
+def fenced_lines(text: str):
+    """Classify lines using matching fence characters and opening fence length."""
+    fence = ""
+    for line in text.splitlines():
+        if fence:
+            if re.fullmatch(r" {0,3}" + re.escape(fence[0]) + "{" + str(len(fence)) + r",}[ \t]*", line):
+                fence = ""
+                yield line, "marker"
+            else:
+                yield line, "code"
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if opening and not (opening[1][0] == "`" and "`" in opening[2]):
+            fence = opening[1]
+            yield line, "marker"
+        else:
+            yield line, "prose"
+
+
 def parse_sections(text: str) -> tuple[list[str], list[tuple[str, str]]]:
     h1: list[str] = []
     sections: list[tuple[str, list[str]]] = []
     current: list[str] | None = None
-    in_fence = False
-
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-            if current is not None:
-                current.append(line)
-            continue
-        if in_fence:
+    for line, kind in fenced_lines(text):
+        if kind != "prose":
             if current is not None:
                 current.append(line)
             continue
@@ -84,31 +95,15 @@ def parse_sections(text: str) -> tuple[list[str], list[tuple[str, str]]]:
 
 
 def has_content(body: str) -> bool:
-    content_lines = []
-    in_fence = False
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            content_lines.append(stripped)
-        elif stripped and not stripped.startswith("#"):
-            content_lines.append(stripped)
-    return bool("".join(content_lines).strip())
+    return any(
+        line.strip() and (kind == "code" or not line.strip().startswith("#"))
+        for line, kind in fenced_lines(body)
+        if kind != "marker"
+    )
 
 
 def prose_without_fences(body: str) -> str:
-    lines = []
-    in_fence = False
-    for line in body.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-            continue
-        if not in_fence:
-            lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(line for line, kind in fenced_lines(body) if kind == "prose")
 
 
 def detect_language(titles: list[str], contracts: dict[str, list[str]]) -> str | None:
@@ -249,6 +244,20 @@ def validate_claude(text: str, language: str, custom_structure: bool = False) ->
 
 
 def self_test() -> int:
+    # Markdown examples may contain shorter or different fence markers.
+    for opening, inner, closing in [("````markdown", "```python", "````"), ("~~~", "```", "~~~"), ("````", "```", "`````")]:
+        sample = f"# Title\n## Real\n{opening}\n{inner}\n## Example\nTODO: code\n{closing}\n## Next\nText.\n"
+        _, parsed = parse_sections(sample)
+        if [title for title, _ in parsed] != ["Real", "Next"]:
+            print("self-test failed: fenced heading parsed as a section", file=sys.stderr)
+            return 1
+        code_body = parsed[0][1]
+        if not has_content(code_body) or "TODO:" in prose_without_fences(code_body):
+            print("self-test failed: fenced content classified as prose", file=sys.stderr)
+            return 1
+    if has_content("```\n```") or prose_without_fences("```\ncode\n```\nTODO: prose") != "TODO: prose":
+        print("self-test failed: fence boundary misclassified", file=sys.stderr)
+        return 1
     agents_zh = """# Demo AI 协作说明
 
 ## 文档职责、适用范围与规则优先级

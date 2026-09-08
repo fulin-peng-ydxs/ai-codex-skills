@@ -23,10 +23,10 @@ description: 分析项目代码与现有文档后，按业务模块、平台模�
    - 按业务闭环、用户入口、API/CLI 边界、数据所有权、平台能力或技术子系统划分模块。
    - 不把每个文件夹机械生成成一篇文档；也不把多个职责强行塞进一篇大文档。
 
-3. 生成文档结构。
-   - 读取 `references/architecture-doc-model.md`。
-   - 对每个模块按需要写：模块定位、核心技术、业务/系统架构、页面/接口/运维使用说明、业务流程、数据与权限、与其它模块关系、风险事项。
-   - 当前项目架构文档的可借鉴点是“核心技术 + 架构关系 + 使用说明 + 流程 + 风险”的组织方式，不是具体业务模块名称或领域规则。
+3. 确定文档结构。
+   - 完整读取并遵守 `references/output-contract.md`，使用固定 Markdown 二级章节、固定顺序和最低内容。
+   - 读取 `references/architecture-doc-model.md`，按业务、平台、数据、前端、集成或运维模块调整固定章节内的内容，不改变默认章节名称和信息归属。
+   - 用户明确指定结构或仓库存在必须保持的文档/机器契约时才偏离默认骨架，并在交付说明中记录原因。
 
 4. 验证事实。
    - 读取 `references/evidence-and-quality.md`。
@@ -36,6 +36,7 @@ description: 分析项目代码与现有文档后，按业务模块、平台模�
 5. 落地与索引。
    - 一项模块一篇文档，文件名使用稳定 kebab-case：`<output-dir>/<module-slug>.md`。
    - 有现有文档时优先更新原文件，不重复创建相同模块文档。
+   - 对每个输出文件运行 `scripts/validate_architecture_doc_structure.py <document-path>`；存在已说明的结构例外时改用 `--custom-structure`。校验失败时先修复，不交付未通过的文档。
    - 同步需要的文档入口，例如 README 的文档索引或架构目录索引；不要复制全文。
    - 汇报写入文件的绝对路径、覆盖模块、证据来源和未覆盖风险。
 
@@ -49,6 +50,8 @@ description: 分析项目代码与现有文档后，按业务模块、平台模�
 ## 资源入口
 
 - `references/module-discovery.md`：模块识别和拆分规则。
-- `references/architecture-doc-model.md`：模块架构文档结构和条件章节。
+- `references/output-contract.md`：固定章节、最低内容、内容归属和已有文档迁移规则；生成或重构时必须完整读取。
+- `references/architecture-doc-model.md`：不同模块类型在固定章节中的内容适配方式。
 - `references/evidence-and-quality.md`：证据、去冗余、风险和落地检查。
 - `scripts/detect_architecture_modules.py`：项目模块候选扫描脚本，只辅助发现，不替代代码阅读。
+- `scripts/validate_architecture_doc_structure.py`：校验固定章节、顺序、重复标题、空章节和占位内容。
