@@ -16,7 +16,7 @@ description: 分析项目代码与现有文档后，按业务模块、平台模�
 1. 发现模块和事实源。
    - 读取 `README.md`、`AGENTS.md`、已有架构/设计/API/需求文档、主要源码目录、路由、服务、存储、前端页面、测试和配置。
    - 运行 `scripts/detect_architecture_modules.py <repo-root>` 收集候选模块、现有架构文档、API/服务/前端/测试入口。
-   - 输出目录按固定顺序决策：用户指定目录 > 项目已有架构目录 > `agent-works/architecture/`。没有现成架构目录时，创建并使用 `agent-works/architecture/`。
+   - 输出目录和文件名按 [模块发现规则](references/module-discovery.md#输出路径) 确定。
 
 2. 选择模块边界。
    - 读取 `references/module-discovery.md`。

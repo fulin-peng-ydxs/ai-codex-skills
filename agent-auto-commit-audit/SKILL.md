@@ -99,7 +99,7 @@ git remote get-url origin
 
 - `requirement.md`：需求范围、需求编号、建议实现处理状态、验收标准和遗留确认项。
 - `plan.md`：任务状态、实际落地情况、需求映射、验证计划、风险、假设和待确认项。
-- 对应 `agent-works/{feature-slug}/` 下的开发留痕、业务核查、测试记录和阶段总结。
+- 按全局目录归属规则定位同一需求目录下的开发留痕、业务核查、测试记录和阶段总结。
 - SQL、seed、权限、菜单、配置、环境变量、脚本、`README.md`、`DESIGN.md`、`AGENTS.md`、`CLAUDE.md` 等稳定事实文档。
 - 模块或功能关联的技术架构文档。
 

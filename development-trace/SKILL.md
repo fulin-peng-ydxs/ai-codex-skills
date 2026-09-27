@@ -1,6 +1,6 @@
 ---
 name: development-trace
-description: 为当前会话或当前 Git 工作区中的业务代码改动生成开发留痕文档。仅当用户显式调用 `$development-trace` 时使用，不得根据代码改动、开发完成、文档需求或相似语义自动调用；输出 Markdown 到项目根目录 ./agent-works/{feature-slug}/development-trace.md，按功能需求拆分，一项功能一个目录，并优先复用同一功能已有的 agent-works 目录以保持 development-trace.md、business-audit.md 等文档归档一致。
+description: 为当前会话或当前 Git 工作区中的业务代码改动生成开发留痕文档。仅当用户显式调用 `$development-trace` 时使用，不得根据代码改动、开发完成、文档需求或相似语义自动调用；按功能需求生成或更新 development-trace.md，输出目录遵循全局协作规则。
 ---
 
 # Development Trace
@@ -57,17 +57,7 @@ description: 为当前会话或当前 Git 工作区中的业务代码改动生�
 
 ## 输出位置与命名
 
-统一输出到项目根目录下的 `./agent-works/` 归档目录；文档属于具体需求、功能或模块时，优先放到：
-
-```text
-./agent-works/{feature-slug}/development-trace.md
-```
-
-目录与命名规则：
-
-- `./agent-works/{feature-slug}/` 中的 `{feature-slug}` 是业务英文名或稳定功能英文名，使用小写 kebab-case。
-- 同一功能的需求文档、开发计划、开发留痕、业务核查、SQL、测试记录、复盘记录等必须复用同一目录。
-- 若 `./agent-works/` 已有相关分类或功能目录，优先复用；不要在项目根目录生成零散 Markdown，除非用户明确指定。
+- 输出目录遵循全局协作规则 `~/ai-agent-config/config/force/collaboration-rule.md` 的“建文档目录时”；本技能文件名为 `development-trace.md`。
 - 文档标题使用中文功能需求名称。
 - 如果目标 `development-trace.md` 已存在，优先增量更新；保留仍然准确的历史内容，仅在内容明显错误、过期或与当前实现冲突时才删除或改写。
 
@@ -157,7 +147,7 @@ description: 为当前会话或当前 Git 工作区中的业务代码改动生�
 5. 阅读必要 diff 和代码上下文，按功能需求分组。
 6. 对照需求文档、开发计划和实际代码，收集性能与安全方案、验证结果和偏差证据。
 7. 形成拟生成/更新方案，并按“确认流程”向用户确认。
-8. 用户确认后，为每个功能生成或更新 `agent-works/{feature-slug}/development-trace.md`。
+8. 用户确认后，为每个功能生成或更新目标目录中的 `development-trace.md`。
 9. 完成后汇报项目根目录、生成或更新的文档路径、覆盖的功能需求、主要证据来源。
 
 ## 输出约束

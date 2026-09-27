@@ -24,7 +24,7 @@ description: 基于项目当前代码、数据结构和配置，还原单个业�
 1. 读取目标项目的协作说明和文档规范。
 2. 明确目标业务功能、项目根目录和输出意图。仅要求分析时在对话中输出；明确要求生成、保存或更新文档时才写文件。无论输出到对话还是文件，完整闭环分析都使用同一稳定章节。
 3. 每次执行完整闭环分析前，完整读取 [references/output-contract.md](references/output-contract.md) 和 [references/data-permission-runtime.md](references/data-permission-runtime.md)；数据权限是闭环分析的固定组成，不因项目未显式声明权限框架而跳过。
-4. 输出路径按以下顺序选择：用户指定路径 > 同一功能已有闭环文档 > `agent-works/{feature-slug}/{feature-slug}-closed-loop-flow.md`。不得覆盖含义不明或属于其他功能的文件。
+4. 用户指定路径或同一功能已有闭环文档时使用该路径；否则输出目录遵循全局协作规则 `~/ai-agent-config/config/force/collaboration-rule.md` 的“建文档目录时”，文件名为 `{feature-slug}-closed-loop-flow.md`。不得覆盖含义不明或属于其他功能的文件。
 
 ## 事实发现
 
