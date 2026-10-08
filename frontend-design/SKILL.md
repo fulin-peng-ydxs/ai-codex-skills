@@ -1,11 +1,27 @@
 ---
 name: frontend-design
-description: Guidance for distinctive, intentional visual design when building new UI, web pages, landing pages, dashboards, components, or reshaping an existing frontend. Use when Codex needs aesthetic direction, typography, visual hierarchy, layout, copy, or design quality that avoids generic AI templates and default-looking interfaces.
+description: Guidance for intentional visual and interaction design when building or reshaping mobile apps, PWAs, web pages, landing pages, dashboards, or components. Use when Codex needs typography, hierarchy, density, layout, copy, or aesthetic direction grounded in the product and its target device.
 ---
 
 # Frontend Design
 
-Approach this as the design lead at a small studio known for giving every client a visual identity that could not be mistaken for anyone else's. This client has already rejected proposals that felt templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take one real aesthetic risk you can justify.
+Make deliberate choices grounded in the product, its audience, and the user's brief. Read the project's design system and same-role components before choosing typography, density, or visual treatments; preserve established contracts unless the user authorizes changing them.
+
+## Choose the product context
+
+- For expressive landing, editorial, or brand pages, use the visual exploration below; a distinctive aesthetic choice can serve the brief.
+- For mobile apps, PWAs, and recurring task tools, use the App guidance below. Task efficiency and consistent controls come first; a hero, new font pairing, or aesthetic risk is not a required deliverable.
+- Interpret feedback against the intended function and target element. Changing a container background is different from changing its buttons; improving an unattractive hierarchy marker does not authorize removing the hierarchy requirement. Resolve routine styling from the existing brief rather than repeatedly seeking approval.
+
+## App and PWA guidance
+
+- Design the frequent task at the smallest supported phone width first, then enhance tablet and desktop layouts. Choose ordering, grouping, and entry points for touch rather than shrinking a desktop page. Keep related short fields together when their values and errors fit; allow long fields to use the full width.
+- Distinguish primary submission, utility actions, editable conditions, and inputs. Use shared role styles and project touch-target requirements; a sufficiently large hit area does not require a large painted button. Compare same-role controls side by side, including font, baseline, radius, padding, and disabled/loading states.
+- Titles and markers must communicate the user's task, not add decoration. Use the project's type hierarchy and restrained grouping; system fonts can serve every role without introducing additional families.
+- For selectors, distinguish browsing, temporary search, selected value, and committed form value. Design opening, selection, cancellation, keyboard dismissal, field handoff, and page departure together; do not treat focus alone as proof that a keyboard appeared. Respect target-platform input behavior and accessibility zoom rather than globally disabling scaling.
+- Give each overlay a clear scroll owner. Size candidates within the actual visible viewport and remaining header/footer space; a menu that fits its outer bounds but clips rows is still unusable. Fixed actions, navigation, and safe areas must work at the bottom of the page and during input.
+- Define what survives navigation and what closes or pauses on departure. Returning from an auxiliary manager should reach its originating task with draft and scroll state intact; hidden screens must not retain active overlays or steal focus.
+- Critique the rendered result on the affected consumers using realistic long values and multiple conditions, not only an empty/default screenshot. Fix visible contract violations, clipping, and blocked interactions before calling the design complete. Follow the project's retest and evidence rules; type checks, CSS declarations, desktop phone-sized windows, and historical screenshots prove different things. Report unverified behavior when tools are limited or the user explicitly waives a check.
 
 ## Ground it in the subject
 
@@ -13,9 +29,9 @@ If the brief does not pin down what the product or subject is, pin it yourself b
 
 ## Design principles
 
-For web designs, the hero is a thesis. Open with the most characteristic thing in the subject's world, in whatever form makes sense for it: a headline, an image, an animation, a live demo, an interactive moment. Be deliberate with your choice: a big number with a small label, supporting stats, and a gradient accent is the template answer, only use if that's truly the best option.
+For landing and editorial designs, the hero is a thesis. Open with the most characteristic thing in the subject's world, in whatever form makes sense for it: a headline, an image, an animation, a live demo, an interactive moment. Be deliberate with your choice: a big number with a small label, supporting stats, and a gradient accent is the template answer, only use if that's truly the best option.
 
-Typography carries the personality of the page. Pair the display and body faces deliberately, not the same families you would reach for on any other project, and set a clear type scale with intentional weights, widths, and spacing. Make the type treatment itself a memorable part of the design, not a neutral delivery vehicle for the content.
+For expressive sites, typography carries the personality of the page. Pair the display and body faces deliberately, not the same families you would reach for on any other project, and set a clear type scale with intentional weights, widths, and spacing. For established products, preserve their type system and express hierarchy through its existing roles.
 
 Structure is information. Structural devices, numbering, eyebrows, dividers, labels, should encode something true about the content, not decorate it. Many generic designs use numbered markers (01 / 02 / 03), but that's only appropriate if the content actually is a sequence, like a real process or a typed timeline where order carries information the reader needs. Question if choices like numbered markers actually make sense before incorporating them.
 
@@ -29,9 +45,9 @@ Consider written content carefully. Often a design brief may not contain real co
 
 For calibration: AI-generated design right now clusters around three looks: (1) a warm cream background (near #F4F1EA) with a high-contrast serif display and a terracotta accent; (2) a near-black background with a single bright acid-green or vermilion accent; (3) a broadsheet-style layout with hairline rules, zero border-radius, and dense newspaper-like columns. All three are legitimate for some briefs, but they are defaults rather than choices, and they appear regardless of subject. Where the brief pins down a visual direction, follow it exactly. The brief's own words always win, including when it asks for one of these looks. Where it leaves an axis free, don't spend that freedom on one of these defaults. Just like a human designer who's hired, there's often a careful balance between doing what you're good at and taking each project as a chance to experiment and learn.
 
-Work in two passes. First, brainstorm a short design plan based on the human's design brief: create a compact token system with color, type, layout, and signature. Color: describe the palette as 4-6 named hex values. Type: the typefaces for 2+ roles: a characterful display face that's used with restraint, a complementary body face, and a utility face for captions or data if needed. Layout: a layout concept, using one-sentence prose descriptions and ASCII wireframes to ideate and compare. Signature: the single unique element this page will be remembered by that embodies the brief in an appropriate way.
+For expressive sites without an established design system, work in two passes. First, brainstorm a short design plan based on the human's design brief: create a compact token system with color, type, layout, and signature. Color: describe the palette as 4-6 named hex values. Type: choose faces for display, body, and captions or data where needed. Layout: use one-sentence prose descriptions and ASCII wireframes to compare concepts. Signature: choose a distinctive element that embodies the brief. For an existing App, instead map its task, control roles, and interaction states to the project's current tokens and components.
 
-Then review that plan against the brief before building: if any part of it reads like the generic default you would produce for any similar page rather than a choice made for this specific brief, revise that part, say what you changed and why. Only after you've confirmed the relative uniqueness of your design plan should you start to write the code, following the revised plan exactly and deriving every color and type decision from it.
+Then review the choices against the brief before building. For expressive sites, revise generic defaults that fail to reflect the subject; for Apps, revise ordering, density, or interaction that slows the task or conflicts with the design system. Derive color and type decisions from the resulting design, and check the actual rendered result after implementation.
 
 When writing the code, be careful of structuring your CSS selector specificities. It's easy to generate CSS classes that cancel each other out, especially with a type-based selector like `.section` and an element-based selector like `.cta`. This can happen often with paddings and margins between sections.
 
@@ -39,7 +55,7 @@ Try to do a lot of this planning and iteration in your thinking, and only show i
 
 ## Restraint and self-critique
 
-Spend your boldness in one place. Let the signature element be the one memorable thing, keep everything around it quiet and disciplined, and cut any decoration that does not serve the brief. Not taking a risk can be a risk itself. Build to a quality floor without announcing it: responsive down to mobile, visible keyboard focus, reduced motion respected. Critique your own work as you build, taking screenshots if your environment supports it. A picture is worth 1000 tokens. Consider the advice: before leaving the house, take a look in the mirror and remove one accessory. Human creators have memory and always try to do something new, so if you have a space to quickly jot down notes about what you've tried, it can help you in future passes.
+For expressive sites, spend boldness in one place and keep the rest disciplined. For task Apps, prioritize consistency, clear hierarchy, and low interaction cost. Cut decoration that does not serve the brief. Check the supported responsive layouts, visible focus, and reduced motion; inspect screenshots and actual interactions rather than treating correct CSS or successful compilation as a finished design. Keep observations in the response unless the user requests a saved process record.
 
 ## More on writing in design
 
