@@ -1,62 +1,66 @@
-# App and PWA Design Checklist
+# App 与 PWA 设计检查清单
 
-Use when building or reshaping an app or PWA with a declared mobile target. Apply the sections relevant to the change; use the project's target devices, design system, and verification rules. A desktop-only PWA does not acquire mobile requirements merely by supporting installation. These checks do not prescribe a framework, component name, universal fixed header, alignment direction, or animation duration.
+用于开发或重构明确以移动端为目标的 App 或 PWA。按本次改动选择适用章节，目标设备、设计系统和验证规则以项目要求为准。仅面向桌面的 PWA 不因支持安装就自动承担移动端要求。本清单不规定框架、组件名称，也不统一要求固定页头、对齐方向或动画时长。
 
-## Task, hierarchy, and density
+## 任务、层级与密度
 
-- Start with the smallest supported phone viewport and the frequent task, then enhance larger layouts. Arrange for touch instead of shrinking a desktop page; keep related short fields together only when their values and errors fit.
-- Separate primary submission, utility actions, editable conditions, and inputs. A large touch target does not require a large painted control; preserve reachability when reducing visual bulk.
-- Evaluate the usable body space after headings, filters, actions, navigation, and safe areas. Consolidate repetitive headings, helper text, and secondary metadata before shrinking readable text or hit areas.
-- Use realistic long values, multiple filters, errors, and keyboard states. Group titles and markers should communicate the task; improve their hierarchy without removing a needed grouping function.
+- 以项目支持的最窄手机视口和高频任务为起点，再完善较大视口的布局。按触摸操作组织界面，不只是缩小桌面页面；仅在字段值和错误信息均可容纳时，将相关短字段组合排布。
+- 区分主要提交、工具操作、可编辑条件和输入字段。较大的触摸命中区不要求同样大的可见控件底板；降低视觉体量时仍须保证操作可达。
+- 根据控件角色及周围线索选择边框和背景，不因元素可点击就机械添加。独立命令可能需要可见底板；分组清楚的行或标题工具可通过标签、展开或跳转标识、按下反馈表达可操作性。避免所有控件都有边框，也避免为视觉简洁消除操作线索。
+- 评估标题、筛选、操作、导航和安全区占用后剩余的正文空间。优先合并重复标题、帮助文本和次要信息，再考虑缩小文字或命中区。
+- 使用真实的长值、多条件筛选、错误及键盘状态检查布局。分组标题与标记应传达任务；改善层级时保留必要的分组功能。
 
-## Scroll ownership and fixed regions
+## 滚动归属与固定区域
 
-- Identify the scroll owner of the page and each overlay, plus any intentionally fixed regions. Verify these boundaries at the start, middle, and end of content; fixed behavior is a product decision, not a requirement for every header.
-- Reserve space once for fixed actions and navigation, using their actual occupied space and safe areas. Check the final item, bottom gaps, transparent-area clicks, and short as well as long content.
-- Distinguish native inertia, local edge feedback, scroll chaining, and movement of the outer page. Repair unwanted outer movement without making ordinary scrolling rigid; avoid simulated touch physics unless the interaction requires it.
-- Keep position indicators within their scroll surface and out of the touch path. Choose visibility and exit timing consistently for the same role, and release timers and listeners on departure.
-- For long lists, distinguish content clipping from a data limit. Choose scrolling, pagination, or progressive loading for the task, and expose the actual continuation state. A clear pager does not need prose explaining how to page; use a count or search prompt only when it resolves a real limit or ambiguity. Match footer alignment and control styling to equivalent lists.
+- 明确页面及各弹层的滚动归属，以及有意固定的区域。在内容顶部、中部和末端验证边界；是否固定属于产品决策，不要求所有页头固定。
+- 明确操作区参与布局还是覆盖内容，吸附定位时也须判断。仅预留使内容可达所需的空间，导航与安全区只计算一次；已由布局分配的空间，不再添加覆盖占位。检查末项、展开字段、底部空隙、透明区域点击，以及短内容和长内容。
+- 区分原生惯性、局部边界反馈、滚动传递和外层页面移动。修复非预期的外层移动时，不让正常滚动变得生硬；除非交互确有需要，避免自行模拟触摸物理效果。
+- 滚动位置提示应位于所属滚动区域内，避开触摸操作路径。同角色提示采用一致的显隐和消退时机，离开时释放计时器与监听。
+- 长列表区分内容裁切和数据数量限制。按任务选择滚动、分页或渐进加载，并展示真实的后续浏览状态。清楚的分页控件不需要额外文字解释如何翻页；数量或搜索提示只用于解决实际限制或歧义。末尾区域对齐与控件样式应和同类列表一致。
 
-## Alignment and native controls
+## 对齐与原生控件
 
-- Compare control boxes, text insets, helper/error text, baselines, and vertical text centers separately. A common border does not prove that text aligns; native date/time/select controls need actual target-platform inspection.
-- Choose numeric alignment for the role: editing continuity and comparison across rows have different needs. Define a coherent convention for each role instead of forcing every number to one side.
-- Compare same-role controls across consumers in default, disabled, loading, and error states. Check inherited and responsive overrides rather than relying on a shared class name.
+- 分别比较控件外框、文字内缩、帮助或错误文本、基线及文字垂直中心。外框一致不代表文字对齐；原生日期、时间和选择控件须在目标平台实际检查。
+- 按数字的角色选择对齐方式：连续编辑和跨行比较的需求不同。为每种角色定义一致约定，不把所有数字强制对齐到同一侧。
+- 比较各使用点中同角色控件的默认、禁用、加载和错误态。检查继承样式及响应式覆盖，不只依赖共享 class 名称。
 
-## Input, keyboard, and overlays
+## 输入、键盘与弹层
 
-- Design browsing, temporary search, selected value, and committed form value as distinct states. Cover opening, selection, cancellation, keyboard dismissal, field handoff, and navigation without prematurely changing the selected value.
-- Size candidates and overlays within the actual visible viewport and remaining fixed regions. Check complete rows, scrolling, and reachable actions; an outer box that fits while its content is clipped is not sufficient.
-- Treat focus, keyboard appearance, and viewport scaling separately. Prevent unintended tap/focus zoom using platform-appropriate controls while retaining accessibility zoom; do not globally disable scaling to mask layout faults.
+- 将候选浏览、临时搜索、当前选值和已确认的表单值作为不同状态设计。覆盖打开、选择、取消、收起键盘、字段交接和页面导航，避免提前修改选值。
+- 区分取消临时搜索和清除已确认选值。恢复操作应无需滚完整个长候选列表即可发现；位置与展开方向以交互契约为准，不统一要求顶部操作行或向下展开。
+- 根据实际可见视口及固定区域占用后的可用空间，确定候选区和弹层尺寸。检查完整候选行、内部滚动与操作可达性；外框未越界但内部内容被裁切，仍不算完成。
+- 分别处理焦点、键盘出现和视口缩放。采用适合目标平台的控件，防止非预期的点击或聚焦缩放，同时保留无障碍缩放能力；不通过全局禁用缩放掩盖布局问题。
+- 同时设计键盘展开与收起后的恢复。在所属滚动容器内使当前字段可见，收起时保留有效阅读位置；延迟执行的视口或滚动修复须防止影响新的焦点会话或非活动页面。重置所有滚动位置不是通用修复方法。
 
-## Touch intent and platform capability
+## 触摸意图与平台能力
 
-- Define the relationship between tap, long press, dragging, and native text selection. Cancel a pending long press when scrolling begins and prevent a drag from becoming a release click; provide a discoverable alternative to gesture-only commands. Do not introduce swipe actions simply because the target is mobile.
-- Where native selection/callouts conflict with actionable buttons or cards, suppress them within those targets while preserving editable fields and text users need to copy. Diagnose selection, tap highlights, and focus outlines separately; avoid blanket removal of keyboard focus indicators.
-- Separate responsive layout decisions from input and API capabilities. Viewport width is a layout signal, not proof of a phone or a touch-only device. Check feature availability and secure-context requirements where relevant, including non-local HTTP access; an optional draft or client helper failure must not silently swallow the primary action.
+- 明确点击、长按、拖动和原生文本选择之间的关系。开始滚动时取消待触发长按，避免拖动结束变成点击；仅靠手势的命令须提供可发现的替代入口。不因目标是移动端就引入滑动操作。
+- 原生选词或操作菜单与按钮、卡片操作冲突时，仅在相应目标内限制，保留可编辑字段及用户需要复制的文本。分别诊断选区、点击高亮和焦点边框，避免全局移除键盘焦点标识。
+- 区分响应式布局决策、输入方式和 API 能力。视口宽度是布局信号，不能证明设备是手机或仅支持触摸。相关场景检查能力可用性及安全上下文要求，包括非本机 HTTP 访问；可选草稿或客户端辅助能力失败，不得使主操作无反馈地失效。
 
-## Charts and transient feedback
+## 图表与瞬态反馈
 
-- Choose how a touch user reads values before choosing chart effects. Use labels, fixed readouts, or deliberate selection where they improve legibility; hover is not a sufficient mobile path, and not every chart needs the same pattern.
-- Test dragging across a chart as part of page scrolling. Ensure scroll intent does not accidentally select, navigate, or commit an action, and keep readouts away from finger occlusion and fixed controls.
-- Define when transient feedback ends: pointer departure, focus departure, dismissal, page hiding, and data changes as applicable. Check touch and desktop behavior separately.
-- Place status messages so they do not cover fixed actions or shift unrelated page regions. Choose dismissal by message role: routine success can expire automatically, while errors or recovery actions may need to remain. For conditional helper text, use an existing row or stable allocation where continuity matters; a long message must still fit the supported width.
-- Preserve card hierarchy without spending body space on repeated counts and action rows. Align secondary metadata with its related value where that improves scanning, rather than imposing one universal card arrangement.
+- 先确定触摸用户如何读取数值，再选择图表效果。标签、固定读数或主动选择能提升可读性时再采用；hover 不能独自构成完整移动端路径，也不要求所有图表使用同一种模式。
+- 实测从图表区域开始拖动并滚动页面。滚动意图不应误触数据选择、导航或提交；读数避开手指遮挡和固定控件。
+- 按适用场景明确瞬态反馈的结束条件：指针离开、焦点离开、主动关闭、页面隐藏或数据变化。分别检查触摸与桌面行为。
+- 根据影响范围、严重程度、阻断程度和恢复动作决定提示位置。字段错误靠近对应字段；页面级次要信息可放稳定的状态或标题区域，按需展开详情；阻断性失败须有可达的恢复路径。避免每条提示都变成警告块或模态弹窗。消息应适配空间、不遮挡操作或推移无关区域，并保留符合其角色的阅读时间；常规成功反馈可自动结束，恢复动作可能需要持续保留。条件帮助文本在需要保持布局连续性时使用稳定空间。
+- 保留卡片层级，不为重复数量和操作行浪费正文空间。次要信息与相关数值对齐能提升扫描效率时再采用，不统一规定一种卡片排列。
 
-## Numeric presentation and semantic color
+## 数字展示与语义颜色
 
-- Establish display precision separately from calculation and storage. If the product omits redundant zero decimals, apply that rule consistently to amounts, prices, quantities, and percentages without rounding meaningful precision or rewriting partially typed input. Reuse the project's exact-decimal formatter where required rather than converting business amounts to binary floating point.
-- Map numeric color from domain meaning, not from the fact that an element is a number or a button. Compare summaries, cards, ranks, and chart readouts in supported themes; verify computed colors because local selector specificity can override the intended semantic class. Keep labels and controls in their own visual roles and retain non-color cues where needed.
+- 展示精度与计算、存储分别约定。产品省略冗余全零小数时，金额、单价、数量和百分比按约定一致处理，不舍弃有效精度或改写尚未完成的输入。需要精确十进制处理时复用项目格式化入口，不将业务金额转为二进制浮点数。
+- 数字颜色来自领域含义，不因元素是数字或按钮就套用。比较支持主题下的摘要、卡片、排行和图表读数；检查计算后的实际颜色，局部选择器优先级可能覆盖预期语义 class。标签和控件保持各自视觉角色，必要时保留非颜色线索。
+- 对比度需要时，区分语义强调色、可读文字色及色块内部前景色。各主题复用项目 token 角色，不将一种颜色强行用于文字、图标填充和描边；警告色的具体色相由产品约定。
 
-## Copy and recovery
+## 文案与恢复
 
-- Describe what was saved, what was not saved, and what the user can do next. Distinguish local backup failure from failure of the primary operation; do not expose implementation terms unless they help the user act.
-- Keep labels, search prompts, and action names consistent across equivalent contexts. Explain meaningful differences rather than mechanically giving different operations the same wording.
+- 说明哪些内容已保存、哪些未保存，以及用户下一步能做什么。区分本地备份失败和主操作失败；实现术语只有在帮助用户行动时才呈现。
+- 同类场景的标签、搜索提示及动作名称保持一致。有实际含义差异时解释差异，不机械地给不同操作使用相同文案。
 
-## Navigation, reuse, and evidence
+## 导航、复用与证据
 
-- Define what is retained, closed, or paused when leaving a page. Auxiliary flows should return to the originating task with the agreed draft, conditions, and scroll state; hidden pages must not retain active overlays or steal focus.
-- Distinguish first entry, cached tab return, explicit detail/drill return, and data refresh. Apply each position source only for its intended transition; an old return parameter must not repeatedly overwrite the user's latest scroll. Restore after content is ready, and guard delayed work against a changed route, inactive page, or newer request.
-- Find shared components, state helpers, and style roles before implementing the same behavior again. Verify affected consumers, including edits inside overlays and hidden pages on return; reuse requires consistent behavior, not just an import.
-- Confirm the version actually loaded. Use rendered geometry, screenshots, and direct interaction for visual and gesture claims; type checks and CSS declarations establish different facts.
-- Follow project rules for browser emulation, native simulator, device browser, and installed PWA checks. Focus alone does not prove a keyboard appeared; a phone-sized desktop window does not prove native gestures. Report uncovered behavior, and do not make a physical-device test mandatory for every change without a concrete project or platform reason.
+- 明确离开页面时保留、关闭或暂停哪些内容。辅助流程应返回原任务，并保留约定的草稿、条件和滚动位置；隐藏页面不得保留活动弹层或抢占焦点。
+- 区分首次进入、缓存 tab 返回、明确的详情或下钻返回，以及数据刷新。位置来源只在对应转换中生效，旧返回参数不得反复覆盖用户最新滚动位置。内容就绪后再恢复；延迟操作须防止影响已变化的路由、非活动页面或更新的请求。
+- 再次实现相同行为前，先查共享组件、状态工具和样式角色。验证受影响使用点，包括弹层内编辑及隐藏页面返回；复用要求行为一致，不只是引入同一个组件。
+- 确认实际加载版本。视觉与手势结论使用渲染几何、截图和直接操作证明；类型检查与 CSS 声明证明的是不同事实。
+- 浏览器模拟、原生模拟器、设备浏览器和安装版 PWA 按项目规则检查。只有焦点不能证明键盘已出现，手机尺寸的桌面窗口不能证明原生手势。报告未覆盖行为；没有具体项目或平台依据，不将实体设备复测作为每次改动的强制要求。

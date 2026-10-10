@@ -1,66 +1,66 @@
 ---
 name: frontend-design
-description: Guidance for intentional visual and interaction design when building or reshaping mobile apps, PWAs, web pages, landing pages, dashboards, or components. Use when Codex needs typography, hierarchy, density, layout, copy, or aesthetic direction grounded in the product and its target device.
+description: 为新建或重构移动应用、PWA、网页、落地页、仪表盘及组件提供有明确依据的视觉与交互设计指导。用于需要结合产品及目标设备确定字体、层级、密度、布局、文案或审美方向的场景。
 ---
 
-# Frontend Design
+# 前端设计
 
-Make deliberate choices grounded in the product, its audience, and the user's brief. Read the project's design system and same-role components before choosing typography, density, or visual treatments; preserve established contracts unless the user authorizes changing them.
+根据产品、受众和用户要求作出有依据的设计选择。确定字体、密度或视觉处理方式前，先读取项目设计系统及同角色组件；已有契约保持有效，除非用户授权变更。
 
-## Choose the product context
+## 判断产品场景
 
-- For expressive landing, editorial, or brand pages, use the visual exploration below; a distinctive aesthetic choice can serve the brief.
-- For mobile apps, PWAs, and recurring task tools, use the App guidance below. Task efficiency and consistent controls come first; a hero, new font pairing, or aesthetic risk is not a required deliverable.
-- Interpret feedback against the intended function and target element. Changing a container background is different from changing its buttons; improving an unattractive hierarchy marker does not authorize removing the hierarchy requirement. Resolve routine styling from the existing brief rather than repeatedly seeking approval.
+- 注重视觉表达的落地页、内容专题页或品牌页，使用下文的视觉探索方法；鲜明的审美选择可以服务用户要求。
+- 移动应用、PWA 和高频任务工具，使用下文的 App 指导。优先保证任务效率与控件一致性，不要求必须设计大幅首屏展示区、重新搭配字体或尝试冒险的视觉方案。
+- 根据目标功能及具体元素理解用户反馈。调整容器背景与调整其中按钮是不同改动；改善层级标记的外观，不等于获得删除层级要求的授权。日常样式选择依据已有要求处理，不反复索取确认。
 
-## App and PWA guidance
+## App 与 PWA 指导
 
-For mobile apps and PWAs with a declared mobile target, read [references/app-design-checklist.md](references/app-design-checklist.md) before shaping the interface, then use its applicable checks to critique the rendered result. A desktop-only PWA uses the project's desktop task and interaction contracts; installability alone does not require phone layouts or keyboard tests. For a local change, cover the affected behavior and consumers rather than treating every checklist item as a mandatory full-app audit.
+明确以移动端为目标的 App 和 PWA，在设计界面前读取 [App 与 PWA 设计检查清单](references/app-design-checklist.md)，完成后按适用项检查实际渲染结果。仅面向桌面的 PWA 遵循项目的桌面任务与交互契约，不因支持安装就要求手机布局或键盘测试。局部改动覆盖受影响行为及使用点，不将每个清单条目都升级为全应用强制审查。
 
-Design around the frequent task, the target input methods, and the project's existing component roles. Define what stays fixed, what scrolls, and what survives navigation before adjusting density or styling. The checklist supplies decision criteria; dimensions, alignment choices, timings, and terminal verification requirements come from the project and the user's brief.
+围绕高频任务、目标输入方式和项目既有组件角色进行设计。调整密度或样式前，明确哪些区域固定、哪些区域滚动，以及导航后保留哪些状态。检查清单提供判断依据；尺寸、对齐方式、时序和终端验证要求来自项目规范与用户要求。
 
-## Ground it in the subject
+## 从具体主题出发
 
-If the brief does not pin down what the product or subject is, pin it yourself before designing: name one concrete subject, its audience, and the page's single job, and state your choice. If there's any information in your memory about the human's preferences, context about what they're building, or designs you've made before, use that as a hint. The subject's own world, its materials, instruments, artifacts, and vernacular, is where distinctive choices come from. Build with the brief's real content and subject matter throughout.
+用户要求未明确产品或主题时，设计前先确定一个具体主题、目标受众和页面的核心任务，并说明选择。已有用户偏好、产品背景或过往设计信息可作为参考。鲜明的设计应来自主题自身的材料、工具、实物和惯用表达；全过程使用与要求相符的真实内容和主题素材。
 
-## Design principles
+## 设计原则
 
-For landing and editorial designs, the hero is a thesis. Open with the most characteristic thing in the subject's world, in whatever form makes sense for it: a headline, an image, an animation, a live demo, an interactive moment. Be deliberate with your choice: a big number with a small label, supporting stats, and a gradient accent is the template answer, only use if that's truly the best option.
+落地页和内容专题页的首屏应表达核心主张。以主题最有代表性的内容开场，形式可以是标题、图片、动画、实时演示或交互体验。选择须有依据；大数字配小标签、辅助统计和渐变强调是常见模板，只在确实适合时采用。
 
-For expressive sites, typography carries the personality of the page. Pair the display and body faces deliberately, not the same families you would reach for on any other project, and set a clear type scale with intentional weights, widths, and spacing. For established products, preserve their type system and express hierarchy through its existing roles.
+注重视觉表达的网站通过字体传达个性。有依据地搭配展示字体与正文字体，不对所有项目重复使用同一组字体；明确字号层级，并有意安排字重、字宽及间距。成熟产品保留既有字体系统，通过已有角色表达层级。
 
-Structure is information. Structural devices, numbering, eyebrows, dividers, labels, should encode something true about the content, not decorate it. Many generic designs use numbered markers (01 / 02 / 03), but that's only appropriate if the content actually is a sequence, like a real process or a typed timeline where order carries information the reader needs. Question if choices like numbered markers actually make sense before incorporating them.
+结构本身应传达信息。编号、标题上方的引题、分隔线和标签须表达内容的真实关系，而非纯装饰。编号标记（01 / 02 / 03）仅在内容确有顺序时适用，例如实际流程或次序具有信息价值的时间线。采用编号等结构手段前，先判断其是否有意义。
 
-Leverage motion deliberately. Think about where and if animation can serve the subject: a page-load sequence, a scroll-triggered reveal, hover micro-interactions, ambient atmosphere. An orchestrated moment usually lands harder than scattered effects; choose what the direction calls for. However, sometimes less is more, and extra animation contributes to the feeling that the design is AI-generated.
+有目的地使用动效。判断页面载入序列、滚动触发展示、悬停微交互或氛围动效是否服务主题。统一编排的关键动效通常比零散效果更有表现力，具体取舍服从设计方向。适度克制，多余动画容易增加模板化的 AI 生成感。
 
-Match complexity to the vision. Maximalist directions need elaborate execution; minimal directions need precision in spacing, type, and detail. Elegance is executing the chosen vision well.
+复杂度应匹配设计方向。丰富的视觉方案需要充分实现；简洁方案需要精确处理间距、字体和细节。设计品质来自对既定方向的完整执行。
 
-Consider written content carefully. Often a design brief may not contain real content, and it's up to you to come up with copy. Copy can make a design feel as templated as the design itself. See the below section on writing for more guidance.
+认真设计文案。用户要求未提供实际内容时，需要结合主题补充。文案和视觉同样可能呈现模板感，具体方法见下文的设计文案部分。
 
-## Process: brainstorm, explore, plan, critique, build, critique again
+## 工作过程：构思、探索、规划、评估、实现、再次评估
 
-For calibration: AI-generated design right now clusters around three looks: (1) a warm cream background (near #F4F1EA) with a high-contrast serif display and a terracotta accent; (2) a near-black background with a single bright acid-green or vermilion accent; (3) a broadsheet-style layout with hairline rules, zero border-radius, and dense newspaper-like columns. All three are legitimate for some briefs, but they are defaults rather than choices, and they appear regardless of subject. Where the brief pins down a visual direction, follow it exactly. The brief's own words always win, including when it asks for one of these looks. Where it leaves an axis free, don't spend that freedom on one of these defaults. Just like a human designer who's hired, there's often a careful balance between doing what you're good at and taking each project as a chance to experiment and learn.
+校准视觉选择时，留意常见的 AI 设计套路：（1）暖奶油色背景（接近 #F4F1EA），搭配强对比衬线展示字体和陶土色强调；（2）近黑背景，搭配单一亮荧光绿或朱红强调；（3）报纸式布局，使用细线、直角和密集分栏。这些风格在部分需求中成立，但不应脱离主题自动套用。用户已指定方向时严格遵循，即使要求上述风格也以用户要求为准；仍有设计自由的部分应作出有依据的选择。平衡已有设计能力与适合本项目的探索。
 
-For expressive sites without an established design system, work in two passes. First, brainstorm a short design plan based on the human's design brief: create a compact token system with color, type, layout, and signature. Color: describe the palette as 4-6 named hex values. Type: choose faces for display, body, and captions or data where needed. Layout: use one-sentence prose descriptions and ASCII wireframes to compare concepts. Signature: choose a distinctive element that embodies the brief. For an existing App, instead map its task, control roles, and interaction states to the project's current tokens and components.
+没有既有设计系统、且注重视觉表达的网站，分两轮处理。先根据用户要求构思简短设计方案，确定颜色、字体、布局和标志性元素，形成精简的 token 系统。颜色使用 4–6 个命名的十六进制色值；字体按需选择展示、正文、说明或数据角色；布局用简短文字和 ASCII 线框比较方案；标志性元素应体现主题。已有 App 则将任务、控件角色和交互状态映射到项目当前 token 与组件。
 
-Then review the choices against the brief before building. For expressive sites, revise generic defaults that fail to reflect the subject; for Apps, revise ordering, density, or interaction that slows the task or conflicts with the design system. Derive color and type decisions from the resulting design, and check the actual rendered result after implementation.
+实现前再对照用户要求评估选择。视觉表达型网站修正不能体现主题的通用套路；App 修正拖慢任务或违背设计系统的信息顺序、密度及交互。颜色与字体选择应服务最终方案，实现后检查实际渲染结果。
 
-When writing the code, be careful of structuring your CSS selector specificities. It's easy to generate CSS classes that cancel each other out, especially with a type-based selector like `.section` and an element-based selector like `.cta`. This can happen often with paddings and margins between sections.
+编码时注意 CSS 选择器的优先级和覆盖关系，避免 `.section`、`.cta` 等 class 的样式相互覆盖，尤其检查区域间的内边距与外边距。
 
-Try to do a lot of this planning and iteration in your thinking, and only show ideas to the user when you have higher confidence it'll delight them.
+尽量先在内部完成方案推敲与迭代，形成较有把握、能满足用户期待的方案后再展示。
 
-## Restraint and self-critique
+## 克制与自审
 
-For expressive sites, spend boldness in one place and keep the rest disciplined. For task Apps, prioritize consistency, clear hierarchy, and low interaction cost. Cut decoration that does not serve the brief. Check the supported responsive layouts, visible focus, and reduced motion; inspect screenshots and actual interactions rather than treating correct CSS or successful compilation as a finished design. Keep observations in the response unless the user requests a saved process record.
+视觉表达型网站将大胆设计集中在一个重点，其余部分保持克制。任务型 App 优先保证一致性、清楚层级和较低交互成本。删除不服务需求的装饰。检查支持的响应式布局、可见焦点和减少动态效果偏好；通过截图及实际交互核对结果，不以 CSS 正确或编译成功代替设计完成。检查发现默认在回复中说明，用户要求保存过程记录时再落盘。
 
-## More on writing in design
+## 设计文案
 
-Words appear in a design for one reason: to make it easier to understand, and therefore easier to use. They are design material, not decoration. Bring the same intentionality to copy that you would bring to spacing and color. Before writing anything, ask what the design needs to say, and how it can best be said to help the person navigate the experience.
+界面文字用于帮助理解和使用，是设计材料而非装饰。文案应像间距和颜色一样有明确意图。写作前先判断界面需要表达什么，以及怎样表达能帮助用户完成任务。
 
-Write from the end user's side of the screen. Name things by what people control and recognize, never by how the system is built. A person manages notifications, not webhook config. Describe what something does in plain terms rather than selling it. Being specific is always better than being clever.
+从用户视角写作，按用户能识别和控制的事物命名，不按系统实现命名。例如用户管理的是通知，而非 webhook 配置。用平实语言说明功能，不使用推销式表达；具体清楚优于刻意巧妙。
 
-Use active voice as default. A control should say exactly what happens when it's used: "Save changes," not "Submit." An action keeps the same name through the whole flow, so the button that says "Publish" produces a toast that says "Published." The vocabulary of an interface is the signposting for someone navigating the product. Cohesion and consistency are how people learn their way around.
+默认使用主动表达。控件文案准确说明结果，例如“保存修改”，而非泛泛的“提交”。同一动作在完整流程中保持名称一致，例如“发布”按钮对应“已发布”提示。界面用词提供操作指引，一致表达帮助用户学习使用产品。
 
-Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
+失败和空状态应提供行动方向，而非渲染情绪。用界面自身的语气说明问题与修复方法，不模仿个人情绪；错误提示不靠道歉填充，也不模糊发生了什么。空页面应引导下一步行动。
 
-Keep the register conversational and tuned: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each element do exactly one job. A label labels, an example demonstrates, and nothing quietly does double duty.
+语言自然，使用简单动词，删除填充词，语气匹配品牌与受众；英文文案采用句首大写。每个元素职责单一：标签用于标识，示例用于演示，不让同一元素暗中承担不同职责。
