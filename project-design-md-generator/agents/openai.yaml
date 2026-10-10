@@ -1,4 +1,4 @@
 interface:
   display_name: "生成项目 DESIGN.md"
-  short_description: "依据项目契约与前端事实创建或修订设计规范，明确待确认的关键选择"
-  default_prompt: "使用 $project-design-md-generator 在授权范围内创建或更新 DESIGN.md，依据项目事实并确认尚未授权的关键规范选择。"
+  short_description: "为已有项目归纳设计规范，或依据需求与已确认方案初始化新项目规范"
+  default_prompt: "使用 $project-design-md-generator 创建或更新 DESIGN.md：已有前端归纳有效契约与实现，从零项目依据需求初始化，并分别说明决策、实现与验证状态。"
