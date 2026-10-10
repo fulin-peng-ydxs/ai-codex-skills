@@ -22,13 +22,14 @@ description: 为当前项目生成或更新 `DESIGN.md`：扫描前端代码，�
 - `DESIGN.md` 必须基于当前项目真实前端实现、可验证样式和已存在的设计模式生成。
 - 对后台、运营台、工作台等高密度业务界面，`DESIGN.md` 必须覆盖表格、列表、筛选区、弹窗、抽屉等高频容器规则。
 - 对高密度业务界面，要同时抽取项目已有稳定事实，并在必要时补齐缺失规范；不能把低质量现状直接固化进 `DESIGN.md`。
+- 项目声明移动 App/PWA 目标时，按 [前端审查清单](references/frontend-audit-checklist.md#移动-apppwa-规范覆盖) 的适用项检查契约覆盖；具体检查内容在清单维护，不将某项目的固定区域、对齐方向、尺寸或时序推广为通用规范。
 - 如果项目现有前端明显不统一、缺少必要规范或多个风格冲突，不要强行把混乱现状写成规范；先提出收敛建议并等待用户确认。
 - 生成 `DESIGN.md` 时优先抽取稳定事实，其次才是合理补全；补全内容必须明确是建议性决策，而不是伪装成既有事实。
 
 生成时按以下顺序：
 
-1. 读取 `references/design-md-structure.md`
-2. 读取 `references/frontend-audit-checklist.md`
+1. 读取 [references/design-md-structure.md](references/design-md-structure.md)，确定文档结构与事实源职责
+2. 读取 [references/frontend-audit-checklist.md](references/frontend-audit-checklist.md)，执行具体检查；移动端目标同时读取其中的移动规范覆盖部分
 3. 需要写入时读取 `references/design-md-template.md`
 4. 扫描项目并生成或更新 `DESIGN.md`
 

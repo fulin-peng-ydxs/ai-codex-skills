@@ -15,13 +15,9 @@ Make deliberate choices grounded in the product, its audience, and the user's br
 
 ## App and PWA guidance
 
-- Design the frequent task at the smallest supported phone width first, then enhance tablet and desktop layouts. Choose ordering, grouping, and entry points for touch rather than shrinking a desktop page. Keep related short fields together when their values and errors fit; allow long fields to use the full width.
-- Distinguish primary submission, utility actions, editable conditions, and inputs. Use shared role styles and project touch-target requirements; a sufficiently large hit area does not require a large painted button. Compare same-role controls side by side, including font, baseline, radius, padding, and disabled/loading states.
-- Titles and markers must communicate the user's task, not add decoration. Use the project's type hierarchy and restrained grouping; system fonts can serve every role without introducing additional families.
-- For selectors, distinguish browsing, temporary search, selected value, and committed form value. Design opening, selection, cancellation, keyboard dismissal, field handoff, and page departure together; do not treat focus alone as proof that a keyboard appeared. Respect target-platform input behavior and accessibility zoom rather than globally disabling scaling.
-- Give each overlay a clear scroll owner. Size candidates within the actual visible viewport and remaining header/footer space; a menu that fits its outer bounds but clips rows is still unusable. Fixed actions, navigation, and safe areas must work at the bottom of the page and during input.
-- Define what survives navigation and what closes or pauses on departure. Returning from an auxiliary manager should reach its originating task with draft and scroll state intact; hidden screens must not retain active overlays or steal focus.
-- Critique the rendered result on the affected consumers using realistic long values and multiple conditions, not only an empty/default screenshot. Fix visible contract violations, clipping, and blocked interactions before calling the design complete. Follow the project's retest and evidence rules; type checks, CSS declarations, desktop phone-sized windows, and historical screenshots prove different things. Report unverified behavior when tools are limited or the user explicitly waives a check.
+For mobile apps and PWAs, read [references/app-design-checklist.md](references/app-design-checklist.md) before shaping the interface, then use its applicable checks to critique the rendered result. For a local change, cover the affected behavior and consumers rather than treating every checklist item as a mandatory full-app audit.
+
+Design around the frequent task, touch interaction, and the project's existing component roles. Define what stays fixed, what scrolls, and what survives navigation before adjusting density or styling. The checklist supplies decision criteria; dimensions, alignment choices, timings, and terminal verification requirements come from the project and the user's brief.
 
 ## Ground it in the subject
 
