@@ -1,6 +1,6 @@
 # App and PWA Design Checklist
 
-Use when building or reshaping a mobile app or PWA. Apply the sections relevant to the change; use the project's target devices, design system, and verification rules. These checks do not prescribe a framework, component name, universal fixed header, alignment direction, or animation duration.
+Use when building or reshaping an app or PWA with a declared mobile target. Apply the sections relevant to the change; use the project's target devices, design system, and verification rules. A desktop-only PWA does not acquire mobile requirements merely by supporting installation. These checks do not prescribe a framework, component name, universal fixed header, alignment direction, or animation duration.
 
 ## Task, hierarchy, and density
 

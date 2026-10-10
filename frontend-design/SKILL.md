@@ -15,9 +15,9 @@ Make deliberate choices grounded in the product, its audience, and the user's br
 
 ## App and PWA guidance
 
-For mobile apps and PWAs, read [references/app-design-checklist.md](references/app-design-checklist.md) before shaping the interface, then use its applicable checks to critique the rendered result. For a local change, cover the affected behavior and consumers rather than treating every checklist item as a mandatory full-app audit.
+For mobile apps and PWAs with a declared mobile target, read [references/app-design-checklist.md](references/app-design-checklist.md) before shaping the interface, then use its applicable checks to critique the rendered result. A desktop-only PWA uses the project's desktop task and interaction contracts; installability alone does not require phone layouts or keyboard tests. For a local change, cover the affected behavior and consumers rather than treating every checklist item as a mandatory full-app audit.
 
-Design around the frequent task, touch interaction, and the project's existing component roles. Define what stays fixed, what scrolls, and what survives navigation before adjusting density or styling. The checklist supplies decision criteria; dimensions, alignment choices, timings, and terminal verification requirements come from the project and the user's brief.
+Design around the frequent task, the target input methods, and the project's existing component roles. Define what stays fixed, what scrolls, and what survives navigation before adjusting density or styling. The checklist supplies decision criteria; dimensions, alignment choices, timings, and terminal verification requirements come from the project and the user's brief.
 
 ## Ground it in the subject
 
