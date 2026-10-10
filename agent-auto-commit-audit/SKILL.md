@@ -89,6 +89,8 @@ git remote get-url origin
 2. `frontend-reuse-enforcer`
 3. `design-compliance-audit`
 
+三个方向继承本次提交影响范围，按 [前端验证范围与证据](../page-ux-audit/references/verification-evidence.md) 共享有效证据并合并同根因问题；不因组合技能重复全站扫描或降低合规定级。
+
 对受影响路由执行浏览器自动化验证。优先使用项目指定的自动化端口和启动规则。至少检查主流程、可触达的空/加载/错误状态，以及受影响页面的响应式布局。
 
 ### 4. 文档审查与更新

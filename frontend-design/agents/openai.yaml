@@ -1,4 +1,4 @@
 interface:
   display_name: "前端设计"
-  short_description: "创建具有鲜明风格、可用于生产环境的前端界面，兼顾布局与交互。"
-  default_prompt: "使用 $frontend-design 构建具有鲜明风格、可用于生产环境的前端界面。"
+  short_description: "为新建或局部修改界面提供符合产品任务、设备与既有设计系统的指导"
+  default_prompt: "使用 $frontend-design 在指定范围内设计或修改页面，遵循既有设计系统并按任务选择视觉与交互方案。"
