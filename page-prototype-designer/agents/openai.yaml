@@ -1,0 +1,6 @@
+interface:
+  display_name: "页面原型设计"
+  short_description: "根据需求独立制作可交互 HTML 页面原型，承接评审与开发交接"
+  default_prompt: "使用 $page-prototype-designer 根据当前需求制作或更新可交互 HTML 原型，沿用项目设计规范并验证主要操作链路。"
+policy:
+  allow_implicit_invocation: true
