@@ -40,6 +40,8 @@ description: 生成、重构或优化项目 README.md。用于用户要求创建
 
 ## 文档边界
 
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。将下列分工落实为产出文档的具体边界说明，已有同等说明时复用。
+
 - `README.md`：项目对外或对开发者的主入口，承载概览、运行、使用、架构入口和文档索引。
 - `AGENTS.md`：AI 协作约束，不复制到 README，只在需要时链接。
 - `CLAUDE.md`：Claude Code 薄入口，不复制到 README。

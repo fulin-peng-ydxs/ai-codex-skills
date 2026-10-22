@@ -50,6 +50,8 @@ description: 生成或重构项目级 AI 通用约束文档，包括 AGENTS.md �
 
 ## 文档边界
 
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。将下列分工落实为产出文档的具体边界说明，已有同等说明时复用；CLAUDE 薄入口可合并到权威规则入口。
+
 - `AGENTS.md`：所有 AI Agent 的项目级权威说明。
 - `CLAUDE.md`：Claude Code 专用薄入口，只保留入口指引、工作方式和必要记忆规则。
 - `README.md`：产品或开发概览，可作为事实源引用，不承载 AI 协作规则。

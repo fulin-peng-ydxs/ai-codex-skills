@@ -9,6 +9,10 @@ description: 对当前会话或当前 Git 工作区中本次开发涉及的代�
 
 详细核查维度见 `references/audit-dimensions.md`，文档模板见 `references/report-template.md`。
 
+## 产出文档边界
+
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。正式核查文档记录本次改动的业务闭环结论、证据、风险和处理状态；完整需求、实施过程和模块架构由对应文档维护。快速核查仅在现有范围说明中表达边界，不因此落盘。
+
 ## 适用范围
 
 在以下场景使用本技能：

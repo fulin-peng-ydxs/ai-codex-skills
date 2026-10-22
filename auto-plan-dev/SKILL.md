@@ -5,6 +5,10 @@ description: 仅当用户明确提出使用 auto-plan-dev、$auto-plan-dev 或�
 
 # 开发计划生成器
 
+## 产出文档边界
+
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。开发计划维护已确认需求的实施任务、依赖、技术方案、验证安排与进度；需求规则引用上游，实际实施证据由开发留痕维护，长期架构事实由架构文档维护。
+
 ## 强制调用规则
 
 只有当用户明确提出使用 `auto-plan-dev`、`$auto-plan-dev` 或“使用开发计划生成器技能”时，才允许使用本技能。用户只是要求生成开发计划、实施计划、任务拆解或 `plan.md` 时，不得自动启用本技能。

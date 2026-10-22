@@ -1,5 +1,7 @@
 # 模块架构文档输出契约
 
+产出文档的用途、内容归属与维护入口按 [文档边界声明与审查](~/ai-agent-config/config/force/document-boundaries.md) 表达；已有职责或范围章节承载时，不重复加章。
+
 ## 适用规则
 
 结构选择与已有成果保存遵循全局协作规则 `~/ai-agent-config/config/force/collaboration-rule.md` 的“写文档时”。以下标题是参考骨架，最低内容按适用性复核；允许同义标题、合并、调序及有实际需要的新增章节。机器契约、项目标准或用户明确要求的固定结构优先。

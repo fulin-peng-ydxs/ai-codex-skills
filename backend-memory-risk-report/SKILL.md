@@ -5,6 +5,10 @@ description: 分析一个项目的后端，尤其是 Java/Spring 服务中可能
 
 # Backend Memory Risk Report
 
+## 产出文档边界
+
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。报告维护指定后端范围的内存风险、证据、触发条件、验证缺口与处理状态，并说明本次检查时间和基线；不承载完整模块架构或通用运维手册。
+
 ## 概览
 
 使用这个技能分析项目后端代码中可能存在的内存溢出、内存泄漏和持续内存增长风险，并输出完整报告。
