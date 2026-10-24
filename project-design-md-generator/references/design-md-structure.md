@@ -38,30 +38,30 @@ components:
     rounded: "{rounded.md}"
 ---
 
-# 项目名称 Design System
+# 项目名称 设计系统
 
-## 1. Visual Theme & Atmosphere
+## 1. 视觉主题与氛围
 
-## 2. Color Palette & Roles
+## 2. 色彩体系与语义角色
 
-## 3. Typography Rules
+## 3. 字体与排版规范
 
-## 4. Component Stylings
+## 4. 组件样式规范
 
-## 5. Layout Principles
+## 5. 布局原则
 
-## 6. Depth & Elevation
+## 6. 视觉层次与浮层
 
-## 7. Do's and Don'ts
+## 7. 使用规范与禁用事项
 
-## 8. Responsive Behavior
+## 8. 响应式行为
 
-## 9. Agent Prompt Guide
+## 9. AI 提示指南
 
-## 10. Known Gaps
+## 10. 已知缺口
 ```
 
-## Front Matter
+## 文件头元数据
 
 - `version`：沿用项目版本约定；无既有约定的新草案可用 `alpha`，不重置已有版本
 - `name`：项目名或产品名
