@@ -85,4 +85,4 @@
 
 ## 安装态与缓存
 
-仅在项目使用安装、离线或缓存能力且本次受影响时，明确安装态的导航、恢复、更新与失败反馈。实际加载版本和终端证据按 [前端验证范围与证据](../../page-ux-audit/references/verification-evidence.md) 处理。
+仅在项目使用安装、离线或缓存能力且本次受影响时，明确安装态的导航、恢复、更新与失败反馈。实际加载版本和终端证据按 [前端验证规范](~/ai-agent-config/config/force/frontend-verification.md) 处理。

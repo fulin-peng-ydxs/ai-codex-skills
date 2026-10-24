@@ -189,7 +189,7 @@
 - 浏览器关键视口、截图、交互验证。
 - 组件预览、storybook、可视回归或项目指定验证。
 
-证据判定统一读取 [前端验证范围与证据](../../page-ux-audit/references/verification-evidence.md)。本技能将有效证据映射到既有契约，不以重复追加规范代替实现修复。必改违规未解决不能判通过。
+证据判定统一读取 [前端验证规范](~/ai-agent-config/config/force/frontend-verification.md)。本技能将有效证据映射到既有契约，不以重复追加规范代替实现修复。必改违规未解决不能判通过。
 
 未运行时：
 
