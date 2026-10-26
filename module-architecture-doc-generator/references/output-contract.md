@@ -4,7 +4,7 @@
 
 ## 适用规则
 
-结构选择与已有成果保存遵循全局协作规则 `~/ai-agent-config/config/force/collaboration-rule.md` 的“写文档时”。以下标题是参考骨架，最低内容按适用性复核；允许同义标题、合并、调序及有实际需要的新增章节。机器契约、项目标准或用户明确要求的固定结构优先。
+结构策略为**参考结构**，按 [模板与结构选择](~/ai-agent-config/config/force/document-output.md#模板与结构选择) 组织及维护已有成果。最低内容、证据状态及必要固定项见下文；章节可适配不等于条目字段或证据要求可省略。
 
 ## 参考章节与顺序
 
@@ -149,4 +149,4 @@
 - 不适用、静态确认、已执行和待确认没有混写；
 - 路径、API、表、配置、测试和依赖方向均已回查；
 - Mermaid、表格、链接及被标题调整影响的仓库内锚点有效；
-- 已运行 `scripts/validate_architecture_doc_structure.py <document-path>` 并通过；默认使用 `--custom-structure`。仅明确采用脚本内置骨架时省略该参数；外部固定契约单独核对。脚本只验证结构，最低内容必须语义复核。
+- 已运行 `scripts/validate_architecture_doc_structure.py <document-path> --custom-structure` 并通过；默认使用 `--custom-structure`。仅明确采用脚本内置骨架时省略该参数；外部固定契约单独核对。脚本只验证结构，最低内容必须语义复核。

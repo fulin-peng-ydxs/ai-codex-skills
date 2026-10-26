@@ -38,6 +38,8 @@ nits that do not obscure the code.
 
 ## Write the result
 
+Under the [document output rules](~/ai-agent-config/config/force/document-output.md), the finding format, priority semantics and findings-first order below are a **fixed output contract**. Keep every actionable finding and material verification gap; do not expand the response into a generic report template or create a report file unless requested.
+
 Present findings first, ordered by severity. Use one entry per issue in this form:
 
 `[P1] Imperative finding title — path/to/file.rs:line`

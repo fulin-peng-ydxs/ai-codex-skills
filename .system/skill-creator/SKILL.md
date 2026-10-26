@@ -188,6 +188,8 @@ The initializer creates the skill directory, a concise `SKILL.md` starter, and `
 
 ### Write the Instructions
 
+When creating or updating document-producing skills in this environment, read the [document output rules](~/ai-agent-config/config/force/document-output.md). Declare whether a template is a reference structure, default skeleton, or fixed contract, and retain the domain-specific required content, conditional triggers and fixed fields. Skill frontmatter and UI metadata remain machine contracts; this does not impose one document template on all skills.
+
 The frontmatter `description` should briefly explain what the skill does and when it applies. Include a meaningful boundary when similar requests should not activate the skill.
 
 For example:

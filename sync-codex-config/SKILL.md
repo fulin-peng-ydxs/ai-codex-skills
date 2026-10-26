@@ -54,6 +54,8 @@ description: 将 Codex 全局技能集合和协作说明同步到 Claude Code �
 
 ## 同步规则
 
+同步已有文档遵循 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md) 的保留原则：除已定义的目标路径适配外，保留源文档的结构策略、核心内容和固定契约，不在同步过程中重写模板；引用的共享规范须在目标环境可读。
+
 - 只同步 Codex skills 根目录中含 `SKILL.md` 的一级技能目录，以及具有有效 YAML frontmatter 的一级 Markdown 技能文件。
 - 禁止同步任何 MCP 相关技能，不区分创建、同步、审计、监控、安全或其他用途。技能目录名、技能文件名或 YAML frontmatter 中出现 `MCP`（不区分大小写）时，预览与执行均排除，并在输出中列出。
 - 忽略 skills 仓库元数据、隐藏的系统目录、编辑器目录、缓存和构建依赖。

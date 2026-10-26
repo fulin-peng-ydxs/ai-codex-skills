@@ -99,6 +99,8 @@ git remote get-url origin
 
 ### 4. 文档审查与更新
 
+更新文档结构遵循 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md) 及对应技能的内容契约；局部事实修正沿用原结构，不借审查重新套版。
+
 只根据实际完成和已验证结果更新文档。不要把未完成、未验证、未确认内容写成事实。
 
 按 [文档边界声明与审查](~/ai-agent-config/config/force/document-boundaries.md) 检查相关文档的用途、内容归属和正文是否一致；同步时只更新各文档负责的事实或引用，不因内容有关联而复制维护。
@@ -132,7 +134,7 @@ git remote get-url origin
 
 ## 输出
 
-报告默认使用简体中文。按四个方向组织：
+报告默认使用简体中文。按 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md) 使用**默认骨架**，以下四个方向及其适用性、问题处理状态和引用依据必须分别可辨识；同根因问题可以集中描述并关联方向，不重复抄写，也不静默省略未执行方向：
 
 1. 代码审查
 2. 业务审查

@@ -37,6 +37,10 @@ Treat returned guide URLs as opaque: fetch those exact URLs without deriving, su
 - Read `references/prompting-guide.md` only when prompting guidance or prompt changes are actually needed and current official guidance is unavailable.
 - Read `references/upgrade-guide.md` only when current official migration guidance is unavailable. Disclose when a bundled fallback was used.
 
+## Plan output
+
+When a migration plan or document is requested, use the [document output rules](~/ai-agent-config/config/force/document-output.md) as a **reference structure**, after the source checks above. Preserve the requested target, workload scope, verified compatibility constraints, proposed changes, validation criteria and unresolved blockers. A plan does not authorize implementation or require a saved file.
+
 ## Keep implementation changes scoped
 
 Change active model defaults and directly related prompt surfaces only when the user requested that work. Update registries, model pickers, capability metadata, routing, pricing, or tests only when they are in scope and current official documentation verifies the relevant values.

@@ -118,7 +118,7 @@
 4. 新增技能时，至少创建 `技能目录/SKILL.md`，写清名称、用途、触发条件、执行步骤和边界约束。
 5. 技能调用策略须在 `SKILL.md`、`agents/openai.yaml` 和 README 中保持一致；仅显式调用的技能注明点名条件，自动调用的技能写清适用意图与边界。`auto-plan-dev` 支持自动调用，`development-trace` 仍仅显式调用。
 6. 需求协作按阶段选择技能：闭环补齐业务链路，需求文档固化可验收契约，原型表达页面与模拟交互，开发计划承接实现与验证；完成当前阶段不自动启动下一阶段。
-7. 四个技能共用 [需求协作契约](requirement-doc-generator/references/workflow-contract.md)；事实继承、确认、草案保存、已有文件复用及自适应表达在此维护。闭环、需求和计划默认使用各自的标准骨架及条目模板；自适应可合并章节，不得把适用功能点、任务或验证记录压成概述。
+7. 四个技能共用 [需求协作契约](requirement-doc-generator/references/workflow-contract.md)，维护事实继承、确认、草案保存、已有文件复用及阶段条目粒度；通用结构选择引用 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md#模板与结构选择)。闭环、需求和计划使用默认骨架，不得把适用功能点、任务或验证记录压成概述。
 8. HTML/结构图原型的选择、制作与验证规则由 [page-prototype-designer](page-prototype-designer/SKILL.md) 维护；需求技能负责页面范围与引用，计划按普通/专业模式处理前置、读取实际产物或明确的替代依据，不重做已确认原型。
 9. 需求编号与验收契约由 [requirement-doc-generator](requirement-doc-generator/SKILL.md) 维护；任务状态与需求汇总由 [auto-plan-dev](auto-plan-dev/SKILL.md) 维护，不用计划覆盖程度代替实际完成。
 10. 页面复用、组件/布局配置接入按计划技能和项目真实机制确定；自动接入不重复登记，无平台不为模板新增体系，基础能力需真实样板与消费验证。
@@ -134,14 +134,33 @@
 20. 需要实际执行 Git 提交与推送时，使用 `git-push`；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
 21. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
 22. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analyzer`；它默认按稳定的 14 章骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `module-architecture-doc-generator`，单项已实现业务闭环继续使用 `business-closed-loop-flow-analyzer`。
-23. 使用 `module-architecture-doc-generator` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；用户或仓库要求其他结构时，说明例外并使用 `--custom-structure`，结构校验不能替代事实和内容完整性复核。
+23. 使用 `module-architecture-doc-generator` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
 24. 排查磁盘空间或电脑卡顿时，分别使用 `disk-usage-report` 或 `process-usage-report`，默认只读采样并说明测量限制；实际清理前必须读取 [清理安全规则](disk-usage-report/references/cleanup-safety.md)，处理进程前重新核对目标身份与影响，并按技能要求取得明确授权。
+
+## 文档输出规则入口
+
+全部技能按实际产物判断是否适用 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md)，不以“（适用时）”有无判断模板是否固定。各技能或其引用契约维护具体要求，本表只做入口分类；不因适配而新增文档或改变触发方式。
+
+| 结构或处理方式 | 技能范围 | 具体契约位置 |
+| --- | --- | --- |
+| 默认骨架，继承阶段信息粒度 | `requirement-closure-designer`、`requirement-doc-generator`、`auto-plan-dev` | [共用契约](requirement-doc-generator/references/workflow-contract.md)及各阶段条目模板 |
+| 按原型形式承载 | `page-prototype-designer` | [原型技能](page-prototype-designer/SKILL.md)：结构图用默认骨架，HTML 用页面和交互契约 |
+| 参考结构，最低内容必需 | `ai-constraint-doc-generator`、`project-readme-generator`、`module-architecture-doc-generator`、`business-closed-loop-flow-analyzer`、`project-design-md-generator` | 各技能的输出契约或结构参考；结构校验与内容核对分开 |
+| 默认报告骨架，保留逐项证据与状态 | `development-trace`、`backend-memory-risk-report`、`business-feature-audit`、`agent-auto-commit-audit`、`design-compliance-audit`、`page-ux-audit` | 各技能的报告模板与输出要求 |
+| 参考结构，按请求范围输出 | `disk-usage-report`、`process-usage-report`、`code-reviewer`、`frontend-reuse-enforcer`、`frontend-design` | 各技能的报告、反馈或方案要求；不自动落盘 |
+| 默认正文骨架与局部固定契约并存 | `five-dim-stock-analysis`、`ai-trend-knowledge-maintainer` | 报告/季度模板、评分契约；类别模板、元数据与机器校验契约 |
+| 完整模式固定 14 个主章节及顺序 | `project-handover-analyzer` | [接手报告模型](project-handover-analyzer/references/handover-report-model.md)，用户指定摘要或专项范围时按其要求 |
+| 维护或委派文档，沿用原契约 | `ai-instruction-simplifier`、`automation-setup-assistant`、`sync-codex-config` | 精简保留核心要求；自动化引用业务技能；同步仅适配目标路径 |
+| 专用产物，不套通用报告 | `git-commit-msg`、`git-push`、`sync-project-mcp` | 提交消息由 `git-commit-msg` 的 A/B 契约维护；MCP 保留配置字段、协议及结果分类 |
+
+`.system/` 另按实际能力处理：`skill-creator` 在编写文档类技能时声明结构策略；`review-agent` 保留固定发现格式；`openai-docs` 的迁移计划采用参考结构。`imagegen` 生成图像、`skill-installer` 安装既有技能，不因本规范新增文档或改写被安装模板。
 
 ## 编写建议
 
 - 描述要聚焦“什么时候用、具体怎么做、哪些不能做”。
-- 明确输出位置、交付要求、确认条件和安全边界；只有稳定对外接口、机器读取契约或用户明确要求固定的字段才做结构化强约束。
+- 明确输出位置、交付要求、确认条件和安全边界；固定项须有稳定对外接口、机器契约、有效项目/用户要求或技能明确稳定输出契约作为依据。
 - 有固定模板或参考材料时，放进技能目录并在 `SKILL.md` 中显式引用。
+- 文档模板按 [模板与结构选择](~/ai-agent-config/config/force/document-output.md#模板与结构选择) 声明参考结构、默认骨架或固定结构，并分别定义核心内容、条件触发及必要固定项；“适用时”只是提示，不是自适应开关。各技能只维护自身内容契约，不复制通用裁剪规则。
 - 技能面向复用，优先沉淀稳定流程，不把一次性上下文写进全局技能。
 - 通用文档目录规则引用 `~/ai-agent-config/config/force/collaboration-rule.md`；技能仅维护产物文件名、必要子目录和专属路径例外，相关提示词、模板及脚本保持一致。
 - 技能触发方式、关键资源、维护约束发生变化时，优先更新对应 `SKILL.md`，并同步检查本 README 的“当前技能”和使用说明是否仍准确。
@@ -160,5 +179,5 @@
 
 ## 备注
 
-- 本 README 只介绍 `~/.codex/skills/` 下的用户自定义技能，不包含 `~/.codex/skills/.system/` 里的系统内置技能。
+- “当前技能”列表介绍 `~/.codex/skills/` 下的用户自定义技能；`.system/` 仅在输出规则入口说明相关契约，不列为用户自定义技能。
 - 技能内容调整后，建议同步更新对应目录的 `SKILL.md`，保持 README 与实际能力一致。

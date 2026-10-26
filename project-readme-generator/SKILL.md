@@ -35,7 +35,7 @@ description: 生成、重构或优化项目 README.md。用于用户要求创建
 
 5. 自检并汇报。
    - 重读 `README.md` 检查链接、命令、目录、图表、表格和读者路径。
-   - 运行 `scripts/validate_readme_structure.py README.md`；默认使用 `--custom-structure` 检查通用结构，只有项目或用户明确采用脚本内置骨架时才省略该参数。外部固定契约另行逐项核对；脚本通过不能替代最低内容的语义复核。
+   - 运行 `scripts/validate_readme_structure.py README.md --custom-structure`；默认使用 `--custom-structure` 检查通用结构，只有项目或用户明确采用脚本内置骨架时才省略该参数。外部固定契约另行逐项核对；脚本通过不能替代最低内容的语义复核。
    - 汇报写入文件、已验证命令、未写入命令及原因、残余风险。
 
 ## 文档边界

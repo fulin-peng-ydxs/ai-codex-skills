@@ -35,7 +35,7 @@ description: 分析项目代码与现有文档后，按业务模块、平台模�
 5. 落地与索引。
    - 一项模块一篇文档，文件名使用稳定 kebab-case：`<output-dir>/<module-slug>.md`。
    - 有现有文档时优先更新原文件，不重复创建相同模块文档。
-   - 对每个输出文件运行 `scripts/validate_architecture_doc_structure.py <document-path>`；默认使用 `--custom-structure` 检查通用结构，只有项目或用户明确采用脚本内置骨架时才省略该参数。外部固定契约另行逐项核对；脚本通过不能替代最低内容的语义复核。
+   - 对每个输出文件运行 `scripts/validate_architecture_doc_structure.py <document-path> --custom-structure`；默认使用 `--custom-structure` 检查通用结构，只有项目或用户明确采用脚本内置骨架时才省略该参数。外部固定契约另行逐项核对；脚本通过不能替代最低内容的语义复核。
    - 同步需要的文档入口，例如 README 的文档索引或架构目录索引；不要复制全文。
    - 汇报写入文件的绝对路径、覆盖模块、证据来源和未覆盖风险。
 

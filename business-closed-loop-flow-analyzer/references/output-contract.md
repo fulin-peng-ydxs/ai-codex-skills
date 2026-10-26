@@ -1,5 +1,7 @@
 # 闭环流程文档输出契约
 
+按 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md) 使用**参考结构**；下文的业务环节、数据权限链路、表关系、字段赋值与代码证据要求保持有效。不锁定全部标题和顺序；项目明确固定的比较模板除外。
+
 产出文档的用途、内容归属与维护入口按 [文档边界声明与审查](~/ai-agent-config/config/force/document-boundaries.md) 表达；已有职责或范围章节承载时，不重复加章。
 
 ## 参考章节

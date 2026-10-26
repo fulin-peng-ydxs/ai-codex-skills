@@ -4,7 +4,7 @@
 
 ## 适用规则
 
-结构选择与已有成果保存遵循全局协作规则 `~/ai-agent-config/config/force/collaboration-rule.md` 的“写文档时”。以下标题是参考骨架，最低内容按适用性复核；允许同义标题、合并、调序及有实际需要的新增章节。机器契约、项目标准或用户明确要求的固定结构优先。
+结构策略为**参考结构**，按 [模板与结构选择](~/ai-agent-config/config/force/document-output.md#模板与结构选择) 组织及维护已有成果。适用最低内容、入口职责和必要固定项见下文；不得因调整章节而丢失执行约束。
 
 ## AGENTS.md 参考章节
 
@@ -147,4 +147,4 @@
 - `CLAUDE.md` 保持薄入口且没有复制命令块；
 - 命令验证门禁已经通过；
 - 文档链接和受标题调整影响的仓库内锚点有效；
-- 已运行 `scripts/validate_ai_constraint_docs.py <repo-root>` 并通过；默认使用 `--custom-structure`。仅明确采用脚本内置骨架时省略该参数；外部固定契约单独核对。脚本只验证结构，最低内容必须语义复核。
+- 已运行 `scripts/validate_ai_constraint_docs.py <repo-root> --custom-structure` 并通过；默认使用 `--custom-structure`。仅明确采用脚本内置骨架时省略该参数；外部固定契约单独核对。脚本只验证结构，最低内容必须语义复核。

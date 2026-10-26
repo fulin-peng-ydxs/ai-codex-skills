@@ -55,6 +55,8 @@ Analyze the code changes based on the following pillars:
 
 #### Structure
 
+Use the [document output rules](~/ai-agent-config/config/force/document-output.md) as a **reference structure**. Preserve review scope, actionable findings with location, evidence, impact and recommendation, the overall assessment, and material verification gaps. Empty finding categories may be omitted; a review that could not be completed must say so rather than imply approval.
+
 - **Summary**: A high-level overview of the review.
 - **Findings**:
   - **Critical**: Bugs, security issues, or breaking changes.

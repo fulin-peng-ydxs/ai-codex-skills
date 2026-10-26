@@ -41,7 +41,7 @@ description: 生成或重构项目级 AI 通用约束文档，包括 AGENTS.md �
 5. 落地并自检。
    - 验证门禁通过后再写 `AGENTS.md` 和 `CLAUDE.md`。
    - 写完后重读文件，检查职责分离、链接有效性、命令准确性，以及是否误带样例项目内容。
-   - 运行 `scripts/validate_ai_constraint_docs.py <repo-root>`；默认使用 `--custom-structure` 检查通用结构，只有项目或用户明确采用脚本内置骨架时才省略该参数。外部固定契约另行逐项核对；脚本通过不能替代最低内容的语义复核。
+   - 运行 `scripts/validate_ai_constraint_docs.py <repo-root> --custom-structure`；默认使用 `--custom-structure` 检查通用结构，只有项目或用户明确采用脚本内置骨架时才省略该参数。外部固定契约另行逐项核对；脚本通过不能替代最低内容的语义复核。
    - 向用户汇报已写文件、已验证命令、未写入命令及原因。
 
 ## 入口可用性检查
