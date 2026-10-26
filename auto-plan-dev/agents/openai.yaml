@@ -1,6 +1,6 @@
 interface:
   display_name: "开发计划生成器"
-  short_description: "仅显式调用，生成可追溯开发计划并区分范围、覆盖与执行进度"
-  default_prompt: "使用 $auto-plan-dev 根据已确认需求及适用原型生成可执行开发计划，明确任务依赖、验收与状态汇总，按风险展开方案。"
+  short_description: "自动承接开发与计划请求，默认普通模式，支持专业模式和可追溯实施验证"
+  default_prompt: "使用 $auto-plan-dev 生成开发计划，未指定时采用普通模式直接承接自然语言需求；涉及页面时先确认 HTML 或结构图原型选择，明确任务、验收与状态。"
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
