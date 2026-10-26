@@ -1,115 +1,30 @@
 # Git 目录监测示例
 
-当用户希望 Codex 按计划监测本地 Git 目录，并提交所有 Git 可见变化时，使用这个模式。
+本文是 Git 目录监测的配置示例；调度选择、诊断、授权与验证规则由 [技能正文](../SKILL.md) 维护，提交消息格式由 `git-commit-msg` 维护。示例不构成提交或推送授权。
 
-## 用户输入
+## 输入与适用条件
 
-- 要监测的目录：
-  - `/Users/pengshuaifeng/.codex/skills`
-  - `/Users/pengshuaifeng/.claude/skills`
-- 运行时间：每天 `23:00`。
-- 变化规则：提交任何 Git 可见的新增、修改或删除文件；忽略 `.gitignore` 排除的文件。
-- 暂存规则：`git add -A`。
-- 提交消息规则：参考 `/Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md`。
-- 推送规则：提交成功后自动 push。
-- 输出语言：中文。
+以每天 23:00 监测用户指定技能仓库为例。先确定仓库绝对路径、时区、可提交范围，以及是否允许自动 commit 和 push。只有用户明确要求提交全部 Git 可见新增、修改、删除时才使用 `git add -A`，排除 `.gitignore` 文件及禁止提交的内容；否则按授权文件范围暂存。
 
-## 预检查
+默认使用当前线程 heartbeat。用户明确要求独立项目作业时，调用项目列表取得对应 projectId，每个 cron 绑定一个项目；不配置多个 cwd，也不重复创建同目标任务。
 
-创建或更新自动化前，运行这些检查：
+## 预检查与提示词
 
-```bash
-git -C /Users/pengshuaifeng/.codex/skills rev-parse --show-toplevel
-git -C /Users/pengshuaifeng/.claude/skills rev-parse --show-toplevel
-ls -la /Users/pengshuaifeng/.claude/skills/git-commit-msg
-git -C /Users/pengshuaifeng/.codex/skills status --porcelain --untracked-files=all
-git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=all
-```
-
-## 自动化配置
-
-- 对 Git 多仓库监测，创建多个 `cron` 自动化，每个仓库一个自动化。
-- 不要用一个自动化配置多个 cwd 再在提示词里遍历多个仓库；这可能导致手动执行时多次运行，并引发 `.git/index.lock` 竞争。
-
-第一个自动化：
-
-- 类型：`cron`
-- 名称：`每晚提交 Codex 技能目录变更`
-- RRULE: `FREQ=DAILY;BYHOUR=23;BYMINUTE=0;BYSECOND=0`
-- 执行环境：`local`
-- 工作区：`/Users/pengshuaifeng/.codex/skills`
-
-提示词应要求：
+检查仓库根目录、`git status --porcelain --untracked-files=all`、已有暂存内容、提交消息技能路径、Git 身份和远端配置。下面是已经获准自动提交并推送时的提示词骨架；将占位符替换成已核实的实际入口：
 
 ```text
-监测 Git 仓库 /Users/pengshuaifeng/.codex/skills 中未被 .gitignore 忽略的文件变化。
-执行 git -C /Users/pengshuaifeng/.codex/skills status --porcelain --untracked-files=all。
-如果没有 Git 可见变化，报告该仓库没有变化。
-如果存在任何新增、修改或删除，执行 git -C /Users/pengshuaifeng/.codex/skills add -A。
-然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成提交信息：默认项目标识使用 Agent；单一功能/小改动使用单行模板；多文件、多模块、多个相关改动或需要说明影响范围时使用完整模板；只有明确来源时才写需求来源；多个互不依赖需求时优先在结果中说明建议拆分，若仍需本次自动提交则使用完整模板分组概括。
-使用 git -C /Users/pengshuaifeng/.codex/skills commit -m "<提交信息标题>" 创建提交；如果生成了完整模板，使用多个 -m 参数创建提交，第一个 -m 写标题，后续 -m 写正文段落。
-随后必须使用显式命令 git -C /Users/pengshuaifeng/.codex/skills push 推送仓库。
-最终用中文报告处理结果、创建的提交 hash，以及 push 是否成功或失败。
-不要处理其他仓库。
+每天检查 <仓库绝对路径> 的授权文件范围 <范围>，忽略 Git 排除的文件，不处理其他仓库。
+读取并遵守 <git-commit-msg/SKILL.md 的实际路径> 生成提交消息；调用模式以本任务已有授权为准。
+没有变化时保持安静。有变化时检查差异，按授权范围暂存并创建提交；多行消息使用正文文件保留换行。
+提交成功后使用 git -C <仓库绝对路径> push 推送。
+报告有意义的变化、提交 hash、推送结果或需要处理的阻塞；提交成功但推送失败须分别说明，避免重试时重复提交。
 ```
 
-第二个自动化：
+只授权本地提交时删除推送步骤。通知静音设置通过工具字段处理，不混入提示词。生成提交消息时按技能中的项目标识、单行/完整模板、需求来源和多需求分组规则执行，不在自动化中复制一份格式规则。
 
-- 类型：`cron`
-- 名称：`每晚提交 Claude 技能目录变更`
-- RRULE: `FREQ=DAILY;BYHOUR=23;BYMINUTE=0;BYSECOND=0`
-- 执行环境：`local`
-- 工作区：`/Users/pengshuaifeng/.claude/skills`
+## 验证与失败诊断
 
-提示词应要求：
-
-```text
-监测 Git 仓库 /Users/pengshuaifeng/.claude/skills 中未被 .gitignore 忽略的文件变化。
-执行 git -C /Users/pengshuaifeng/.claude/skills status --porcelain --untracked-files=all。
-如果没有 Git 可见变化，报告该仓库没有变化。
-如果存在任何新增、修改或删除，执行 git -C /Users/pengshuaifeng/.claude/skills add -A。
-然后参考 /Users/pengshuaifeng/.claude/skills/git-commit-msg/SKILL.md 中的提交消息模板和规则生成提交信息：默认项目标识使用 Agent；单一功能/小改动使用单行模板；多文件、多模块、多个相关改动或需要说明影响范围时使用完整模板；只有明确来源时才写需求来源；多个互不依赖需求时优先在结果中说明建议拆分，若仍需本次自动提交则使用完整模板分组概括。
-使用 git -C /Users/pengshuaifeng/.claude/skills commit -m "<提交信息标题>" 创建提交；如果生成了完整模板，使用多个 -m 参数创建提交，第一个 -m 写标题，后续 -m 写正文段落。
-随后必须使用显式命令 git -C /Users/pengshuaifeng/.claude/skills push 推送仓库。
-最终用中文报告处理结果、创建的提交 hash，以及 push 是否成功或失败。
-不要处理其他仓库。
-```
-
-## 授权验证
-
-创建自动化后，对精确的 push 命令触发一次授权：
-
-```bash
-git -C /Users/pengshuaifeng/.codex/skills push
-git -C /Users/pengshuaifeng/.claude/skills push
-```
-
-使用 `sandbox_permissions: require_escalated`，并为每条命令设置匹配的持久 `prefix_rule`。
-
-如果自动化线程里出现 `Could not resolve hostname github.com`，但当前聊天线程中 push 正常，说明问题不是 Git 凭据，而是 Codex 自动化线程网络沙箱。处理方式不是换成系统级定时任务，而是：
-
-1. 向用户说明需要持久放开精确 push 命令的风险。
-2. 等用户明确同意。
-3. 在 `~/.codex/rules/default.rules` 写入精确规则：
-
-```text
-prefix_rule(pattern=["git", "-C", "/Users/pengshuaifeng/.codex/skills", "push"], decision="allow")
-prefix_rule(pattern=["git", "-C", "/Users/pengshuaifeng/.claude/skills", "push"], decision="allow")
-```
-
-4. 更新自动化提示词：普通 push 失败时必须用 `require_escalated` 重试同一条命令。
-5. 手动运行自动化本身验证，而不是只在当前聊天线程执行 push。
-
-仅在当前线程执行 push 成功不等于自动化验证通过。还需要手动执行一次自动化，并读取对应 `memory.md`，确认没有重复运行、没有 `.git/index.lock`，并确认 push 在自动化线程中是否仍受网络限制。
-
-## 失败诊断
-
-如果运行结果显示已经创建提交，但 push 因 DNS 或网络错误失败，说明本地提交已经成功，缺少的只是网络授权。
-
-如果运行结果显示没有 Git 可见变化，用下面命令验证：
-
-```bash
-git -C <repo> status --porcelain --untracked-files=all
-```
-
-如果运行结果未能创建提交，检查仓库状态、Git 身份配置、hooks，以及 `git add -A` 是否被允许写入仓库。
+- 在授权与工具能力允许时运行自动化本身，检查运行记录或实际存在的 memory.md，确认没有重复运行、锁竞争，并分别核实 commit 和 push。当前聊天命令成功不能证明后台成功。
+- 无变化时复查 Git 状态；未提交时检查范围、身份、hooks、写权限和已有锁的持有进程，不直接删除锁。
+- 已提交但推送失败时，区分 DNS、网络、沙箱、凭据和远端问题，不把所有失败都归结为缺少网络授权。
+- 权限升级、持久规则和替代调度遵循正文及当前环境限制；禁止升级时报告阻塞。不能实际运行自动化时明确尚未完成后台链路验证。

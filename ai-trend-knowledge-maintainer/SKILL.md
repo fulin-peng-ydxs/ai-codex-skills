@@ -3,13 +3,17 @@ name: ai-trend-knowledge-maintainer
 description: 维护 AI 趋势投资知识源仓库。用于用户要求更新、审查、规范化、复盘或自动化维护 /Users/pengshuaifeng/ai-trend-analysis 中的 Markdown 知识库；也用于判断外部新闻、财报、研报、技术路线、资本开支、订单、产能和政策信息是否应进入 data-source，并同步 metadata、更新记录、候选池和校验闭环。
 ---
 
-# AI趋势知识库维护
+# AI 趋势知识库维护
 
-## 产出文档边界
+## 职责与边界
 
-文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。正式知识文档按实际类别声明负责维护的研究判断、证据或观察事项；跨方向、公司与候选池内容保持明确归属并交叉引用。边界写成本文的具体事实说明，不把模板写作要求带入正文。
+本技能维护 AI 趋势知识源和观察状态，不输出交易操作建议。本文维护任务频率、入库与状态流转流程；字段、方向和来源等项目事实以 metadata 及专项参考文件为准，读取时机见对应约束。
 
-## 默认仓库
+## 输入与前置条件
+
+先确定任务类型、处理窗口和目标仓库；网络不可用时按任务类型降级处理，不编造来源或把缺失证据当成产业变化。
+
+### 默认仓库
 
 默认维护路径：
 
@@ -19,19 +23,15 @@ description: 维护 AI 趋势投资知识源仓库。用于用户要求更新、
 
 如果用户明确给出其他路径，以用户路径为准。
 
-## 核心原则
+### 频率识别
 
-先候选，后正式。自动化运行时由 Codex 按本技能规则完成判断；只有来源冲突、证据不足但影响重大、需要删除大量内容、或会显著改变总纲方法论时，才标记为 `review`。
+自动化 prompt 必须明确声明本次任务类型：`daily`、`weekly`、`monthly`、`quarterly` 或 `event`。
 
-正式更新必须满足至少一个条件：
+不要只依赖“距离上次运行多久”推断频率。执行时使用 `metadata/update-state.json` 的 `jobs.<type>.last_success_at` 作为处理窗口起点，并用候选池表格里的日期筛选本窗口信息。
 
-- 影响趋势判断；
-- 验证或证伪关键瓶颈；
-- 改变资本开支传导方向；
-- 出现真实订单、收入、利润、产能、交付周期变化；
-- 改变某个方向的状态或置信度。
+## 执行流程
 
-## 工作流程
+### 工作流程
 
 1. 读取 `README.md`、`metadata/automation-plan.json`、`metadata/taxonomy.json`、`metadata/sources.json`、`metadata/direction-registry.json`、`metadata/company-registry.json`、`metadata/source-registry.json` 和相关目标文档。
 2. 读取 `metadata/update-state.json`，识别本次任务类型、处理窗口和上次处理时间。
@@ -54,7 +54,21 @@ node scripts/validate-knowledge-base.js
 /Users/pengshuaifeng/.codex/skills/ai-trend-knowledge-maintainer/scripts/validate_repo.sh /Users/pengshuaifeng/ai-trend-analysis
 ```
 
-## 来源层级
+## 核心约束
+
+### 核心原则
+
+先候选，后正式。自动化运行时由 Codex 按本技能规则完成判断；只有来源冲突、证据不足但影响重大、需要删除大量内容、或会显著改变总纲方法论时，才标记为 `review`。
+
+正式更新必须满足至少一个条件：
+
+- 影响趋势判断；
+- 验证或证伪关键瓶颈；
+- 改变资本开支传导方向；
+- 出现真实订单、收入、利润、产能、交付周期变化；
+- 改变某个方向的状态或置信度。
+
+### 来源层级
 
 - `tier_1`：公司财报、投资者关系、监管文件、官方博客、技术白皮书、监管和交易所披露。可用于正式更新。
 - `tier_2`：TrendForce、SemiAnalysis、IDC、Gartner、Omdia 等研究机构或行业数据库。可用于正式更新，但要标注来源。
@@ -65,7 +79,7 @@ node scripts/validate-knowledge-base.js
 
 需要更细的处理标准时，读取 `references/update-policy.md`。
 
-## 更新频率
+### 更新频率
 
 - 日频：只追加候选池，不直接改变正式判断。
 - 周频：整理候选池，自动判断是否更新方向研究或观察清单。
@@ -73,7 +87,7 @@ node scripts/validate-knowledge-base.js
 - 季度：自动更新复盘记录。
 - 重大事件：财报、资本开支指引、真实订单、政策变化、技术路线变化可随时触发。
 
-## 网络受限处理
+### 网络受限处理
 
 自动化遇到网络不可用、DNS 失败、网页无法打开或来源无法访问时，不得中断整个知识库维护流程。
 
@@ -91,7 +105,7 @@ node scripts/validate-knowledge-base.js
 - 把网络失败当作产业趋势变化；
 - 因无法联网而删除已有正式判断。
 
-## 文档契约
+### 文档契约
 
 所有 `data-source` Markdown 必须包含 YAML frontmatter，至少包括：
 
@@ -121,7 +135,7 @@ frontmatter、`metadata/sources.json`、方向状态、候选处理结果和来�
 
 详细字段和新增文档流程见 `references/document-contract.md`。
 
-## 时间窗口文件
+### 时间窗口文件
 
 候选池和观察清单按季度组织。自动化运行时必须先读取 `metadata/update-state.json` 的 `period_policy.active_research_period`。
 
@@ -135,7 +149,7 @@ frontmatter、`metadata/sources.json`、方向状态、候选处理结果和来�
 
 季度复盘在 1/4/7/10 月 1 日运行时，复盘上一自然季度；复盘完成后，将 `active_research_period` 切换或确认到运行日所在自然季度，并创建或更新该季度观察清单。不要在未明确要求时提前写入未来季度文件。
 
-## 方向管理
+### 方向管理
 
 方向总表维护在 `metadata/direction-registry.json`。
 
@@ -148,7 +162,7 @@ frontmatter、`metadata/sources.json`、方向状态、候选处理结果和来�
 
 详细方向状态和流转规则见 `references/direction-management.md`。
 
-## 公司观察池
+### 公司观察池
 
 公司注册表维护在 `metadata/company-registry.json`。
 
@@ -160,13 +174,15 @@ frontmatter、`metadata/sources.json`、方向状态、候选处理结果和来�
 4. 公司画像创建和更新以 `metadata/company-registry.json` 的 `company_profile_policy` 为唯一规则源。
 5. 新建公司画像时必须同步 frontmatter、`metadata/sources.json`、文档内“更新记录”，并运行校验。
 
-## 频率识别
+## 产出边界与交付
 
-自动化 prompt 必须明确声明本次任务类型：`daily`、`weekly`、`monthly`、`quarterly` 或 `event`。
+首次生成或获准补全文档时落实下述产物边界；仅保存、逐字保存或局部更新沿用有效基线，不为补边界扩写或重排，范围外缺口在交付中说明。
 
-不要只依赖“距离上次运行多久”推断频率。执行时使用 `metadata/update-state.json` 的 `jobs.<type>.last_success_at` 作为处理窗口起点，并用候选池表格里的日期筛选本窗口信息。
+### 产出文档边界
 
-## 决策输出
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。正式知识文档按实际类别声明负责维护的研究判断、证据或观察事项；跨方向、公司与候选池内容保持明确归属并交叉引用。边界写成本文的具体事实说明，不把模板写作要求带入正文。
+
+### 决策输出
 
 处理外部信息时，给出明确处理结果：
 
@@ -186,3 +202,7 @@ frontmatter、`metadata/sources.json`、方向状态、候选处理结果和来�
 - 判断链条受到什么影响；
 - 校验是否通过；
 - 哪些点仍需人工复核。
+
+## 验证与完成标准
+
+运行工作流程中的知识库校验，核对候选记录、正式文档、frontmatter、索引和更新状态一致；update/create 必须对应实际落地，日频及网络受限分支不得冒称完成正式更新。
