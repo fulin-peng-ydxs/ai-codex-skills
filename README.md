@@ -101,7 +101,7 @@
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `git-commit-msg` | 根据确定的改动范围生成规范提交消息。 | 基于已确定的 Git 改动范围生成规范化提交消息，默认使用 `Agent` 项目标识，并按单行模板或完整模板输出提交文案；仅显式调用技能时交互确认范围，流程内自动调用时自行核定范围。 | 只输出提交文案，不执行 `git add`、`git commit` 或 `git push`。 |
-| `git-push` | 按确定范围完成暂存、提交和已授权的推送。 | 按确定范围完成 Git 暂存、提交与用户已授权的推送；仅显式调用技能时执行文件范围、提交文案、staged 清单和 push 的交互确认，普通提交流程由 AI 自行核定并连续执行。 | 不扩大文件范围；只有用户要求推送时才执行 `git push`。 |
+| `git-push` | 按确定范围完成暂存、提交和已授权的推送。 | 按确定范围完成 Git 暂存、提交与用户已授权的推送，提交文案统一调用 `git-commit-msg`；仅显式调用技能时执行文件范围、提交文案、staged 清单和 push 的交互确认，普通提交流程由 AI 自行核定并连续执行。 | 不扩大文件范围；只有用户要求推送时才执行 `git push`。 |
 
 ### 投资研究
 
@@ -131,7 +131,7 @@
 17. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-setup-assistant`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
 18. 需要按 Git 提交范围审查近期 AI 自动开发结果时，使用 `agent-auto-commit-audit`；它负责串联代码审查、业务闭环核查、页面审查、必要修复和文档同步，不替代单独的技能开发或常规提交消息生成。报告默认在最终回复或用户指定的本地文档中交付；仅当用户明确要求时，才处理邮件正文、草稿或发送及对应条件检查。
 19. 涉及 Git 提交文案生成时，使用 `git-commit-msg`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-msg` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
-20. 需要实际执行 Git 提交与推送时，使用 `git-push`；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
+20. 需要实际执行 Git 提交与推送时，使用 `git-push`，并由其内部调用 `git-commit-msg` 生成提交文案，复用已确定的范围；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
 21. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
 22. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analyzer`；它默认按稳定的 14 章骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `module-architecture-doc-generator`，单项已实现业务闭环继续使用 `business-closed-loop-flow-analyzer`。
 23. 使用 `module-architecture-doc-generator` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
