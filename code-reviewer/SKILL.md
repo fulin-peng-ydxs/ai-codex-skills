@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Use this skill to review code. It supports both local changes (staged or working tree) and remote Pull Requests (by ID or URL). It focuses on correctness, maintainability, and adherence to project standards.
+description: 审查本地暂存、未暂存改动或指定远端 PR（编号或 URL），重点检查正确性、可维护性和项目规范遵循情况。只要求审查时输出反馈，不修改代码或发布远端评论。
 ---
 
 # 代码审查
