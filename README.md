@@ -152,7 +152,7 @@
 - 创建或重命名自有技能时，先读取 [技能命名规范](skill-authoring-standard/references/skill-naming.md)；英文标识、中文标题和 UI 名称分别按其契约维护。运行 `python3 skill-authoring-standard/scripts/validate_skill_names.py .` 检查本仓库名称，系统和插件技能沿用提供方名称。
 - 描述要聚焦“什么时候用、具体怎么做、哪些不能做”。
 - 明确输出位置、交付要求、确认条件和安全边界；固定项须有稳定对外接口、机器契约、有效项目/用户要求或技能明确稳定输出契约作为依据。
-- 有固定模板或参考材料时，放进技能目录并在 `SKILL.md` 中显式引用。
+- 正文、独立模板与共用资源的取舍遵循 [技能编写规范](skill-authoring-standard/SKILL.md#正文与独立资源的选择)，同时核对相邻技能及产物的内容归属；不按字数或文件数机械拆合。
 - 文档模板按 [模板与结构选择](~/ai-agent-config/config/force/document-output.md#模板与结构选择) 声明参考结构、默认骨架或固定结构，并分别定义核心内容、条件触发及必要固定项；“适用时”只是提示，不是自适应开关。各技能只维护自身内容契约，不复制通用裁剪规则。
 - 技能面向复用，优先沉淀稳定流程，不把一次性上下文写进全局技能。
 - 通用文档目录规则引用 `~/ai-agent-config/config/force/collaboration-rule.md`；技能仅维护产物文件名、必要子目录和专属路径例外，相关提示词、模板及脚本保持一致。
