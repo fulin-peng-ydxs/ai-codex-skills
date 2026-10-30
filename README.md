@@ -2,6 +2,8 @@
 
 这个目录存放当前用户自定义的 Codex 全局技能。每个技能使用独立目录管理，核心入口文件为 `SKILL.md`。
 
+本文维护技能清单、场景选择和资源导航；具体触发条件、执行流程、产物与验证要求以各技能的 `SKILL.md` 及其引用资源为准。
+
 ## 目录用途
 
 - 作用范围：放在 `~/.codex/skills/` 下的技能，可在 Codex 会话中作为全局技能被发现和使用。
@@ -12,7 +14,7 @@
 
 以下列表只包含当前仓库中带有 `SKILL.md` 的用户自定义技能目录；`.system/`、`.git/`、`.idea/` 和未提供技能入口的辅助目录不计入“当前技能”。
 
-按主要使用场景分为以下八类：
+当前共有 26 个用户自定义技能，按主要使用场景分为以下七类：
 
 - [需求设计与开发交付](#需求设计与开发交付)：从需求闭环、正式需求到原型与开发计划。
 - [项目文档与架构治理](#项目文档与架构治理)：维护协作约束、README、设计规范、架构和项目接手文档。
@@ -21,7 +23,6 @@
 - [前端设计与体验治理](#前端设计与体验治理)：覆盖视觉设计、UX、设计规范合规与前端复用。
 - [自动化与工具集成](#自动化与工具集成)：管理 Codex 自动化以及跨工具、MCP 配置同步。
 - [Git 协作](#git-协作)：生成提交消息并按授权完成提交与推送。
-- [投资研究](#投资研究)：维护 AI 趋势投资知识源。
 
 ### 需求设计与开发交付
 
@@ -47,8 +48,8 @@
 
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
-| `backend-memory-risk-analysis` | 识别后端内存泄漏、溢出和异常增长风险。 | 分析 Java/Spring 等后端代码中的内存溢出、泄漏和异常增长风险，并输出结构化检查报告。 | 缺少运行时证据时只能标记为潜在或疑似风险，不能表述为已确认故障。 |
-| `business-closed-loop-analysis` | 还原单个已实现业务功能的端到端运行链路。 | 基于当前代码、数据结构和配置还原单个已实现业务功能从入口到终态的闭环流程，重点覆盖参与者、状态、数据权限、表关系、字段赋值和核心代码证据。 | 只分析已落地功能；未实现需求、当前改动核查和模块架构应使用对应技能。 |
+| `backend-memory-risk-analysis` | 识别后端内存泄漏、溢出和异常增长风险。 | 分析 Java/Spring 等后端代码中的内存溢出、泄漏和异常增长风险，并输出结构化检查报告。 | 优先延续同范围已有报告；无既有成果时默认输出到 `docs/check/memory/{日期}.md`。缺少运行时证据时只能标记为潜在或疑似风险。 |
+| `business-closed-loop-analysis` | 还原单个已实现业务功能的端到端运行链路。 | 基于当前代码、数据结构和配置还原单个已实现业务功能从入口到终态的闭环流程，重点覆盖参与者、状态、数据权限、表关系、字段赋值和核心代码证据。 | 只分析已落地功能，默认在对话中交付，明确要求生成、保存或更新文档时才落盘；未实现需求、当前改动核查和模块架构应使用对应技能。 |
 | `business-feature-audit` | 判断当前改动放回业务链路后是否完整成立。 | 对当前改动做业务闭环核查，检查流程、状态、权限、上下游协同和数据一致性是否成立。 | 不替代页面 UX、DESIGN 合规或前端复用审查；写入报告前需确认范围。 |
 | `code-review` | 审查本地差异或远程 PR 的代码质量。 | 对本地改动或远程 PR 做代码审查，重点关注正确性、可维护性和规范一致性。 | 先明确审查范围；以可复现的正确性问题和项目规范为主要依据。 |
 
@@ -92,7 +93,7 @@
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `automation-management` | 配置、优化和排查 Codex 定时或自动化任务。 | 创建、更新、精简、验证和排查 Codex 自动化任务，包括提示词职责边界、权限、网络、Git push 和定时执行异常。 | 提示词只写差异化约束；网络、推送和持久授权必须保持明确且最小化。 |
-| `config-codex-sync` | 将 Codex 技能与协作说明对齐到 Claude 和 Kimi。 | 将 Codex 全局 skills 与协作说明同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步；Claude 目标文档为 `CLAUDE.md`、Kimi 目标文档为 `AGENTS.md`，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 | 必须先 `--dry-run`；保留目标端独有内容，不同步 MCP 技能或个人绝对路径。 |
+| `config-codex-sync` | 将 Codex 技能与协作说明对齐到 Claude 和 Kimi。 | 将 Codex 全局 skills 与协作说明同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步；Claude 目标文档为 `CLAUDE.md`、Kimi 目标文档为 `AGENTS.md`，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 | 必须先 `--dry-run`；运行时路径按目标环境适配，局部同步使用隔离临时源；保留目标端独有内容，源端删除不会自动删除目标副本。 |
 | `config-project-mcp-sync` | 注册、更新并验证当前项目的本地 MCP 服务。 | 将项目 `.mcp.json` 与 `.codex-mcp` 中声明的 MCP 启动参数同步到 Codex 本地注册信息，并做握手验证。 | 只处理项目真实声明的服务；实际同步后按请求做 JSON-RPC 握手；只检查用 `--dry-run`，只列出再加 `--no-validate`，避免泄露敏感配置。 |
 
 ### Git 协作
@@ -101,12 +102,6 @@
 | --- | --- | --- | --- |
 | `git-commit-message-authoring` | 根据确定的改动范围生成规范提交消息。 | 基于已确定的 Git 改动范围生成规范化提交消息，默认使用 `Agent` 项目标识，并按单行模板或完整模板输出提交文案；仅显式调用技能时交互确认范围，流程内自动调用时自行核定范围。 | 只输出提交文案，不执行 `git add`、`git commit` 或 `git push`。 |
 | `git-push` | 按确定范围完成暂存、提交和已授权的推送。 | 按确定范围完成 Git 暂存、提交与用户已授权的推送，提交文案统一调用 `git-commit-message-authoring`；仅显式调用技能时执行文件范围、提交文案、staged 清单和 push 的交互确认，普通提交流程由 AI 自行核定并连续执行。 | 不扩大文件范围；只有用户要求推送时才执行 `git push`。 |
-
-### 投资研究
-
-| 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
-| --- | --- | --- | --- |
-| `investment-ai-trend-knowledge-maintenance` | 筛选 AI 趋势信息并维护知识库及元数据。 | 维护 AI 趋势投资知识库，处理候选信息、正式文档、元数据和校验闭环。 | 新信息默认先进入候选池；正式更新必须满足证据门槛并同步索引、状态和更新记录。 |
 
 ## 使用方式
 
@@ -128,7 +123,7 @@
 16. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-management`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
 17. 涉及 Git 提交文案生成时，使用 `git-commit-message-authoring`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-message-authoring` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
 18. 需要实际执行 Git 提交与推送时，使用 `git-push`，并由其内部调用 `git-commit-message-authoring` 生成提交文案，复用已确定的范围；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
-19. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `config-codex-sync`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
+19. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `config-codex-sync`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权使用相同的目标、同步源和范围正式同步。需要路径适配或局部同步时先准备隔离临时源，目标专用路径不反写 Codex；Claude、Kimi 适配结果不同时分别准备并执行。Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，保留目标端独有内容，并排除所有 MCP 相关技能；源端删除不会自动清除目标副本。
 20. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analysis`；它按模块判断与接手路径的默认骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `project-module-architecture-doc-authoring`，单项已实现业务闭环继续使用 `business-closed-loop-analysis`。
 21. 使用 `project-module-architecture-doc-authoring` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
 22. 排查磁盘空间或电脑卡顿时，分别使用 `system-disk-usage-analysis` 或 `system-process-usage-analysis`，默认只读采样并说明测量限制；实际清理前必须读取 [清理安全规则](system-disk-usage-analysis/references/cleanup-safety.md)，处理进程前重新核对目标身份与影响，并按技能要求取得明确授权。
@@ -144,12 +139,11 @@
 | 参考结构，最低内容必需 | `ai-constraint-doc-authoring`、`project-readme-authoring`、`project-module-architecture-doc-authoring`、`business-closed-loop-analysis`、`design-spec-authoring` | 各技能的输出契约或结构参考；结构校验与内容核对分开 |
 | 默认报告骨架，保留逐项证据与状态 | `backend-memory-risk-analysis`、`business-feature-audit`、`design-compliance-audit`、`frontend-ux-audit` | 各技能的报告模板与输出要求 |
 | 参考结构，按请求范围输出 | `system-disk-usage-analysis`、`system-process-usage-analysis`、`code-review`、`frontend-reuse-governance`、`frontend-design` | 各技能的报告、反馈或方案要求；不自动落盘 |
-| 默认正文骨架与局部固定契约并存 | `investment-ai-trend-knowledge-maintenance` | 类别模板、元数据与机器校验契约 |
 | 默认骨架，按模块与接手动作整合 | `project-handover-analysis` | [接手报告模型](project-handover-analysis/references/handover-report-model.md)，用户指定摘要或专项范围时按其要求 |
 | 维护或委派文档，沿用原契约 | `ai-instruction-refactoring`、`automation-management`、`config-codex-sync` | 精简保留核心要求；自动化引用业务技能；同步仅适配目标路径 |
 | 专用产物，不套通用报告 | `git-commit-message-authoring`、`git-push`、`config-project-mcp-sync` | 提交消息由 `git-commit-message-authoring` 的 A/B 契约维护；MCP 保留配置字段、协议及结果分类 |
 
-`.system/` 另按实际能力处理：`skill-creator` 在编写文档类技能时声明结构策略；`review-agent` 保留固定发现格式；`openai-docs` 的迁移计划采用参考结构。`imagegen` 生成图像、`skill-installer` 安装既有技能，不因本规范新增文档或改写被安装模板。
+`.system/` 下的系统技能按各自入口维护契约：[skill-creator](.system/skill-creator/SKILL.md) 创建和更新技能，[review-agent](.system/review-agent/SKILL.md) 执行受委派的只读代码审查，[openai-docs](.system/openai-docs/SKILL.md) 提供 OpenAI 产品、API 与 Codex 文档指引，[imagegen](.system/imagegen/SKILL.md) 生成或编辑图像，[skill-installer](.system/skill-installer/SKILL.md) 安装技能。本 README 不另行定义这些技能的产物结构。
 
 ## 编写建议
 
@@ -166,7 +160,6 @@
 - 若 Git 提交流程类技能调整显式调用、流程内自动调用或普通请求的交互边界，也要同步检查 README 是否准确区分各调用模式，且不改变用户对提交与推送的授权范围。
 - 若业务闭环分析类技能调整稳定章节、数据权限运行链路、表关系、字段赋值或与需求闭环、业务核查、模块架构的职责边界，也要同步检查入口文件、关键参考资料和 README 的描述是否一致。
 - 若新增跨工具同步类技能，README 需写清源目录、目标目录、是否先预览、是否覆盖文档、是否保留目标端独有文件，以及是否排除某类技能，避免把一次性复制流程误写成删除式镜像。
-- 若公开数据投资分析类技能调整了评分口径、数据完整性门槛、来源优先级、季度基线、报告模板或采集脚本，必须同步核对入口文件、相关 `references/` 与脚本的约束一致性，并检查 README 的用途和使用边界。
 - 若 MCP 同步类技能新增或调整启动参数同步规则、命令匹配优先级、配置块更新策略或报告脱敏要求，也要同步检查 README 是否已准确反映这些维护约束。
 - 对以需求文档为输入的技能，若调整上游结论继承、模板、原型或验证方式，必须依据实际存在的资源同步检查入口与 README，明确职责和先后关系。
 - 若需求闭环、需求文档或开发计划技能新增了稳定状态枚举、范围映射、原型约束、前端组件与配置接入闭环或是否纳入的约束，也要同步检查 README 是否已写清这些维护规则。
@@ -177,4 +170,4 @@
 ## 备注
 
 - “当前技能”列表介绍 `~/.codex/skills/` 下的用户自定义技能；`.system/` 仅在输出规则入口说明相关契约，不列为用户自定义技能。
-- 技能内容调整后，建议同步更新对应目录的 `SKILL.md`，保持 README 与实际能力一致。
+- 技能能力或边界调整后，以对应目录的 `SKILL.md` 及其引用资源维护事实，并同步本 README 中受影响的清单和说明。
