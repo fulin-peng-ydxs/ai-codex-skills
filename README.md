@@ -37,19 +37,19 @@
 
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
-| `ai-constraint-doc-authoring` | 生成项目级 AI 协作规则和 Claude 薄入口。 | 按适用最低内容和项目结构生成或重构项目级 `AGENTS.md` 与 `CLAUDE.md`，要求基于仓库事实、实际命令验证和结构校验后再落地；检查入口能否引导后续 Agent 找到并判断何时读取需求、设计、架构和运维资料。 | 必须以仓库事实和实际验证为准；入口保留 AI 约束，面向人的操作细节放在 README 或专门指南，避免把“薄入口”扩展为所有文档都要简短。 |
+| `ai-constraint-doc-authoring` | 生成项目级 AI 协作规则和 Claude 薄入口。 | 按适用最低内容和项目结构生成或重构项目级 `AGENTS.md` 与 `CLAUDE.md`，要求基于仓库事实、实际命令验证和结构校验后再落地；检查入口能否引导后续 Agent 找到并判断何时读取需求、设计、架构和运维资料。 | 统一维护命令发现、验证及权威文档，供 README 技能复用；入口保留 AI 约束，面向人的操作细节归 README 或专门指南，不反向依赖 README 生成。 |
 | `skill-authoring-standard` | 统一用户自有技能的命名、编写和整体重构方式。 | 按统一一级领域、必要细分对象与任务能力命名，组织职责、输入、流程、约束、产出和验证，复用系统技能创建与基础校验能力。 | 创建或重命名先读命名规范并运行命名检查；结构可裁剪，重构须对照原核心契约并推演关键分支，格式通过不等于语义保留。 |
 | `ai-instruction-refactoring` | 为 AI 规则和提示词去重、压缩并明确边界。 | 精简、重构和规范 AI 约束文档、`DESIGN.md`、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束；同时保留目标读者理解和执行所需的说明。 | 合并相近规则但不删除面向开发者、运维或业务读者的必要操作步骤；README 和操作指南须保留主要路径。 |
-| `project-module-architecture-doc-authoring` | 按业务模块或技术子系统生成事实型架构文档。 | 基于代码和现有文档，按适用最低内容、参考骨架和结构校验生成或更新模块架构文档，说明关键职责与代表性运行流程，并同步 README/AGENTS 的文档入口。 | 不写愿景或未落地方案；结构校验和事实回查之外，还要检查读者能否理解模块职责、找到入口并完成适用操作。 |
-| `project-handover-analysis` | 形成完整项目或多仓交付包的接手报告。 | 基于完整项目或多仓交付包的源码、配置、构建和部署材料，按模块判断与接手路径的默认骨架生成可复核的接手分析报告，覆盖总体功能、技术与部署架构、模块依赖、交付完整性、典型调用链、风险和接手路线，并保留环境准备、代表性操作、结果检查和失败定位路径。 | 用于全局接手，不替代单模块架构、单业务闭环或代码变更审查；区分支持方案与环境快照，未实际运行的步骤标明验证状态。 |
-| `project-readme-authoring` | 生成或重构面向使用者和开发者的项目入口文档。 | 基于仓库事实和实际命令验证，按核心信息、条件内容和结构校验生成、重构或优化项目 `README.md`。 | README 中推荐的常规命令必须实际验证，结构和链接必须通过检查。 |
+| `project-module-architecture-doc-authoring` | 基于系统代码生成专一技术主题说明。 | 支持功能模块、平台子系统、系统架构、部署架构和特定技术解析，解释组成、机制、依赖、接入与变更影响。 | 技术机制在所属专题维护；逐环节业务明细引用闭环文档，具体环境操作归运维手册，整体交付评估归接手报告。 |
+| `project-handover-analysis` | 评估项目或多仓交付包的接手条件。 | 生成指定版本的完整性、风险与接手路径快照，保留系统全景、关键模块及最小接手链路。 | 引用已有技术专题和业务闭环事实，不复制长期手册；缺失须有预期证据，静态确认与实际运行分开。 |
+| `project-readme-authoring` | 维护面向使用者和开发者的项目入口。 | 生成、重构或局部更新 README，提供定位、最小使用路径、常用开发任务及文档导航。 | 命令复用 AI 约束技能维护的 AGENTS 或其命令正文；来源缺少或失效时先调用该技能补齐，不独立发现和验证命令。 |
 
 ### 审查与业务分析
 
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `backend-memory-risk-analysis` | 识别后端内存泄漏、溢出和异常增长风险。 | 分析 Java/Spring 等后端代码中的内存溢出、泄漏和异常增长风险，并输出结构化检查报告。 | 优先延续同范围已有报告；无既有成果时默认输出到 `docs/check/memory/{日期}.md`。缺少运行时证据时只能标记为潜在或疑似风险。 |
-| `business-closed-loop-analysis` | 还原单个已实现业务功能的端到端运行链路。 | 基于当前代码、数据结构和配置还原单个已实现业务功能从入口到终态的闭环流程，重点覆盖参与者、状态、数据权限、表关系、字段赋值和核心代码证据。 | 只分析已落地功能，默认在对话中交付，明确要求生成、保存或更新文档时才落盘；未实现需求、当前改动核查和模块架构应使用对应技能。 |
+| `business-closed-loop-analysis` | 面向开发者还原已实现业务目标的完整闭环。 | 深入跨模块链路中的角色、状态联动、权限、任务、表关系、字段赋值与消费口径，保留代码证据。 | 不替代共享技术机制或接手评估；默认对话交付，明确要求生成、保存或更新文档时才落盘。 |
 | `business-feature-audit` | 判断当前改动放回业务链路后是否完整成立。 | 对当前改动做业务闭环核查，检查流程、状态、权限、上下游协同和数据一致性是否成立。 | 不替代页面 UX、DESIGN 合规或前端复用审查；写入报告前需确认范围。 |
 | `code-review` | 审查本地差异或远程 PR 的代码质量。 | 对本地改动或远程 PR 做代码审查，重点关注正确性、可维护性和规范一致性。 | 先明确审查范围；以可复现的正确性问题和项目规范为主要依据。 |
 
@@ -118,13 +118,13 @@
 11. 性能、安全与兼容内容按风险展开：需求维护目标及边界，计划维护实现、验证和发布安排；实际证据在已有实施记录维护。
 12. 前端任务按上方“前端设计与体验治理”表选择技能；各维度保留独立判据，同根因问题合并报告，已有有效证据共享使用。
 13. `business-feature-audit` 只负责业务闭环、状态流转、上下游协同和前端业务承接，不替代页面 UX、DESIGN 合规或前端复用治理；涉及这些问题时应转交对应前端审查技能。
-14. 需要还原已实现的单个业务功能从入口、鉴权、筛数、写表、状态推进到终态的实际运行链路时，使用 `business-closed-loop-analysis`；尚未落地的目标流程交给 `requirement-closure-design`，当前改动核查交给 `business-feature-audit`，整个模块或技术子系统说明交给 `project-module-architecture-doc-authoring`。
+14. 需要面向开发者追踪一个业务目标从入口、鉴权、筛数、写表、状态推进到终态时，使用 `business-closed-loop-analysis`，可跨模块和多对象状态机；目标需求设计交给 `requirement-closure-design`，当前改动核查交给 `business-feature-audit`，共享技术机制归技术专题。
 15. `frontend-design` 同时支持整体设计与局部呈现修改；遵循当前产品和设计系统，不因调用技能自动扩大范围或启动全站专项审核。
 16. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-management`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
 17. 涉及 Git 提交文案生成时，使用 `git-commit-message-authoring`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-message-authoring` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
 18. 需要实际执行 Git 提交与推送时，使用 `git-push`，并由其内部调用 `git-commit-message-authoring` 生成提交文案，复用已确定的范围；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
 19. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `config-codex-sync`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权使用相同的目标、同步源和范围正式同步。需要路径适配或局部同步时先准备隔离临时源，目标专用路径不反写 Codex；Claude、Kimi 适配结果不同时分别准备并执行。Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，保留目标端独有内容，并排除所有 MCP 相关技能；源端删除不会自动清除目标副本。
-20. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analysis`；它按模块判断与接手路径的默认骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `project-module-architecture-doc-authoring`，单项已实现业务闭环继续使用 `business-closed-loop-analysis`。
+20. 需要评估整个项目或交付包的完整性、风险和接手顺序时，使用 `project-handover-analysis`，报告保留版本与检查时点；需要持续维护系统/部署架构、功能模块或特定技术机制时，使用 `project-module-architecture-doc-authoring`。业务闭环正文维护逐环节状态、权限、字段与消费口径，README 保留最小使用路径和导航；详细事实不重复维护。
 21. 使用 `project-module-architecture-doc-authoring` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
 22. 排查磁盘空间或电脑卡顿时，分别使用 `system-disk-usage-analysis` 或 `system-process-usage-analysis`，默认只读采样并说明测量限制；实际清理前必须读取 [清理安全规则](system-disk-usage-analysis/references/cleanup-safety.md)，处理进程前重新核对目标身份与影响，并按技能要求取得明确授权。
 
@@ -141,7 +141,7 @@
 | 参考结构，最低内容必需 | `ai-constraint-doc-authoring`、`project-readme-authoring`、`project-module-architecture-doc-authoring`、`business-closed-loop-analysis`、`design-spec-authoring` | 各技能的输出契约或结构参考；结构校验与内容核对分开 |
 | 默认报告骨架，保留逐项证据与状态 | `backend-memory-risk-analysis`、`business-feature-audit`、`design-compliance-audit`、`frontend-ux-audit` | 各技能的报告模板与输出要求 |
 | 参考结构，按请求范围输出 | `system-disk-usage-analysis`、`system-process-usage-analysis`、`code-review`、`frontend-reuse-governance`、`frontend-design` | 各技能的报告、反馈或方案要求；不自动落盘 |
-| 默认骨架，按模块与接手动作整合 | `project-handover-analysis` | [接手报告模型](project-handover-analysis/references/handover-report-model.md)，用户指定摘要或专项范围时按其要求 |
+| 默认骨架，按判断与接手动作整合 | `project-handover-analysis` | [接手报告模板与内容要求](project-handover-analysis/assets/project-handover-report-template.md)，用户指定摘要或专项范围时按其要求 |
 | 维护或委派文档，沿用原契约 | `ai-instruction-refactoring`、`automation-management`、`config-codex-sync` | 精简保留核心要求；自动化引用业务技能；同步仅适配目标路径 |
 | 专用产物，不套通用报告 | `git-commit-message-authoring`、`git-push`、`config-project-mcp-sync` | 提交消息由 `git-commit-message-authoring` 的 A/B 契约维护；MCP 保留配置字段、协议及结果分类 |
 
