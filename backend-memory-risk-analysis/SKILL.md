@@ -60,50 +60,7 @@ description: 分析一个项目的后端，尤其是 Java/Spring 服务中可能
 
 ### 第三步：检查内存风险模式
 
-以 `references/memory-risk-checklist.md` 作为主检查清单。
-
-重点关注：
-
-1. 无边界对象持有：
-- 静态 `Map/List/Set`、单例缓存、本地内存注册表、会话映射、持续增长的队列。
-2. 长生命周期引用泄漏：
-- 未清理的监听器、回调注册表、未移除的 `ThreadLocal` 值、从不清理的订阅关系。
-3. 大对象和缓冲风险：
-- 大结果集一次性加载进内存、反复构建 `List`、`ByteArrayOutputStream`、大 JSON 转换、导入导出缓冲。
-4. 调度与异步堆积：
-- `@Scheduled` 任务不断累积状态、重试队列、延迟任务、没有背压的执行器队列。
-5. 间接引发内存压力的资源泄漏：
-- 流未关闭、HTTP 响应未释放、文件句柄或驱动资源持有时间过长。
-6. 高频对象创建导致的内存尖峰：
-- 热路径反复创建大对象、大负载多次拷贝、多轮内存转换。
-
-搜索和判断时，优先使用直接代码证据，不要泛泛而谈。
-
-Java/Spring 项目可优先搜索：
-
-- `static `
-- `ThreadLocal`
-- `ConcurrentHashMap`
-- `new HashMap`
-- `new ArrayList`
-- `@Scheduled`
-- `ExecutorService`
-- `ScheduledExecutorService`
-- `newFixedThreadPool`
-- `newCachedThreadPool`
-- `BlockingQueue`
-- `ByteArrayOutputStream`
-- `InputStream`
-- `OutputStream`
-- `EasyExcel`
-- `collect(Collectors.toList())`
-- `subList`
-- `addListener`
-- `register`
-- `subscribe`
-- `mqtt`
-- `websocket`
-- `cache`
+读取 [内存风险清单](references/memory-risk-checklist.md)，按本次语言、长生命周期组件和数据密集型路径选择风险模式及检索词。搜索结果只提供候选线索，判断必须回到具体代码证据；风险等级按下文统一判定。
 
 ## 核心约束
 
@@ -120,7 +77,7 @@ Java/Spring 项目可优先搜索：
 3. `Low Risk`
 - 模式值得关注，但当前代码证据偏弱。
 4. `Needs Runtime Evidence`
-- 风险合理存在，但需要 heap dump、profiler、GC 日志或生产监控进一步确认。
+- 风险合理存在，但需要 heap dump、profiler、GC 日志、分配火焰图或生产监控进一步确认。
 
 每条风险都必须说明：
 

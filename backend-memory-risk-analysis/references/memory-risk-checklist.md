@@ -102,6 +102,7 @@ Check for:
 - `ByteArrayOutputStream`
 - in-memory Excel or CSV generation
 - large JSON serialization and repeated object copying
+- hot paths repeatedly creating large objects or converting the same payload through multiple in-memory forms
 - image, stream, binary, or telemetry payload buffering
 
 Typical risk:
@@ -121,27 +122,7 @@ Typical risk:
 
 - Retained native or heap-backed resources increase memory pressure over time.
 
-## 3. Risk Rating Guidance
-
-Use this scale:
-
-### High Risk
-
-- Strong evidence of unbounded retention or guaranteed long-lived references.
-
-### Medium Risk
-
-- Clear growth pattern exists, but cleanup logic or triggering conditions are uncertain.
-
-### Low Risk
-
-- Pattern is suspicious but current evidence is weak.
-
-### Needs Runtime Evidence
-
-- Code suggests risk, but proof needs heap dump, profiler, GC log, allocation flame graph, or production metrics.
-
-## 4. Suggested Search Patterns
+## 3. Suggested Search Patterns
 
 Useful search patterns for Java/Spring projects:
 
@@ -166,7 +147,13 @@ Useful search patterns for Java/Spring projects:
 - `collect(Collectors.toList())`
 - `stream().map`
 - `findAll`
+- `new HashMap`
+- `new ArrayList`
+- `newFixedThreadPool`
+- `newCachedThreadPool`
+- `EasyExcel`
+- `subList`
 
-## 5. Report Contract
+## 4. Report Contract
 
-Use [SKILL.md](../SKILL.md) for evidence grading, progress states, baseline handling and the output path. Read [the report template](output-template.md#内存风险报告) when generating the report; keep evidence, trigger conditions, impact, treatment and runtime verification together for each finding. This checklist defines risk patterns, not a second report or storage contract.
+Use [the rating rules](../SKILL.md#第四步分级与判定) for risk levels and [SKILL.md](../SKILL.md) for evidence requirements, progress states, baseline handling and the output path. Read [the report template](output-template.md#内存风险报告) when generating the report; keep evidence, trigger conditions, impact, treatment and runtime verification together for each finding. This checklist defines risk patterns, not a second report or storage contract.
