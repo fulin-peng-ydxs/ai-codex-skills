@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目 MCP 同步"
+  short_description: "项目 MCP 同步 的完整启动参数并执行注册状态及连接验证。"
+  default_prompt: "使用 $config-project-mcp-sync 将当前项目的 MCP 命令、参数和环境变量同步到 Codex 配置并完成验证。"
