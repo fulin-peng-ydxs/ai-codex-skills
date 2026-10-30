@@ -132,6 +132,8 @@
 
 全部技能按实际产物判断是否适用 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md)，不以“（适用时）”有无判断模板是否固定。各技能或其引用契约维护具体要求，本表只做入口分类；不因适配而新增文档或改变触发方式。
 
+文档边界的共用写法及接入要求统一由 [共用声明骨架](~/ai-agent-config/config/force/document-boundaries.md#共用声明骨架) 维护；各产物模板、输出契约或内联结构在实际生成位置承接具体职责，技能文件自身的边界说明不能代替产物说明。
+
 | 结构或处理方式 | 技能范围 | 具体契约位置 |
 | --- | --- | --- |
 | 默认骨架，继承阶段信息粒度 | `requirement-closure-design`、`requirement-doc-authoring`、`development-workflow` | [共用契约](requirement-doc-authoring/references/workflow-contract.md)及各阶段条目模板 |
