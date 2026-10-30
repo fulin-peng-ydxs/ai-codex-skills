@@ -32,7 +32,7 @@ description: 分析项目代码与现有文档后，按业务模块、平台模�
    - 不把每个文件夹机械生成成一篇文档；也不把多个职责强行塞进一篇大文档。
 
 3. 确定文档结构。
-   - 读取 [输出契约](references/output-contract.md)，按适用最低内容和项目实际选择结构。
+   - 读取 [输出契约](references/output-contract.md)，按适用最低内容，以能力和运行链路组织局部依据、机制、风险与复核，共享内容集中维护。
    - 读取 [内容适配模型](references/architecture-doc-model.md)，按项目类型适配内容与结构。
 
 4. 验证事实。

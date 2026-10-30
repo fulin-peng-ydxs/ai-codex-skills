@@ -14,21 +14,20 @@
 
 按主要使用场景分为以下八类：
 
-- [需求设计与开发交付](#需求设计与开发交付)：从需求闭环、正式需求到开发计划与开发留痕。
+- [需求设计与开发交付](#需求设计与开发交付)：从需求闭环、正式需求到原型与开发计划。
 - [项目文档与架构治理](#项目文档与架构治理)：维护协作约束、README、设计规范、架构和项目接手文档。
-- [审查与业务分析](#审查与业务分析)：检查代码质量、业务闭环、内存风险和自动开发提交，并还原已实现的业务流程。
+- [审查与业务分析](#审查与业务分析)：检查代码质量、业务闭环与内存风险，并还原已实现的业务流程。
 - [系统资源诊断](#系统资源诊断)：分析磁盘空间和进程资源占用，辅助定位清理目标与卡顿来源。
 - [前端设计与体验治理](#前端设计与体验治理)：覆盖视觉设计、UX、设计规范合规与前端复用。
 - [自动化与工具集成](#自动化与工具集成)：管理 Codex 自动化以及跨工具、MCP 配置同步。
 - [Git 协作](#git-协作)：生成提交消息并按授权完成提交与推送。
-- [投资研究](#投资研究)：维护 AI 趋势知识源并分析上市公司。
+- [投资研究](#投资研究)：维护 AI 趋势投资知识源。
 
 ### 需求设计与开发交付
 
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `auto-plan-dev` | 自动承接开发或计划请求，组织可执行、可验证的任务。 | 默认普通模式直接承接自然语言，不强制 PRD；涉及页面时询问 HTML/结构图原型选择。专业模式要求正式需求文档及适用页面原型。 | 按意图自动调用，开发已获授权时按计划继续，只要计划则不开发；自动调用不额外生成计划文件，范围、覆盖、进度及两种模式的验证要求由技能维护。 |
-| `development-trace` | 记录一次功能开发的真实实施和验证结果。 | 仅在用户显式调用 `$development-trace` 时生成开发留痕文档，沉淀改动目标、实现过程和最终结果，并单独记录性能与安全的实际落点、验证证据、方案偏差和剩余风险。 | 仅显式调用；写入前需确认范围，未执行的验证不得写成已完成。 |
 | `requirement-closure-designer` | 把粗需求补全为可落地的业务闭环。 | 分析角色、入口、操作、状态、权限、异常与范围，明确建议状态及未决事项。 | 默认先对话分析，要求保存或确认闭环可落地时保存当前成果；保留内容与确认状态，不自动转正式需求。 |
 | `requirement-doc-generator` | 生成可追溯、可验收的正式需求文档。 | 明确请求 PRD 或需求文档时，继承上游、核实项目事实，形成稳定编号、业务与页面契约、适用的非功能目标和验收。 | 章节按风险展开，保存草案不等于确认；内部实现归计划，原型交给独立技能，复用已有有效成果。 |
 | `page-prototype-designer` | 制作 HTML 交互原型或结构图原型。 | 独立或承接需求/计划，形式未明确时询问选择；HTML 模拟交互，结构图提供页面线框和操作/状态说明，按形式验证。 | 默认在本次功能目录使用 `prototypes/{page-slug}.html` 或 `.md`；不要求先有 PRD，继承已有选择，不自动修改生产页面。 |
@@ -41,14 +40,13 @@
 | `skill-authoring-standard` | 统一用户自有技能的编写和整体重构方式。 | 按职责、输入、流程、约束、产出和验证组织正文，复用系统技能创建与基础校验能力。 | 结构可裁剪；重构须对照原核心契约并推演关键分支，格式通过不等于语义保留。 |
 | `ai-instruction-simplifier` | 为 AI 规则和提示词去重、压缩并明确边界。 | 精简、重构和规范 AI 约束文档、`DESIGN.md`、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束；同时保留目标读者理解和执行所需的说明。 | 合并相近规则但不删除面向开发者、运维或业务读者的必要操作步骤；README 和操作指南须保留主要路径。 |
 | `module-architecture-doc-generator` | 按业务模块或技术子系统生成事实型架构文档。 | 基于代码和现有文档，按适用最低内容、参考骨架和结构校验生成或更新模块架构文档，说明关键职责与代表性运行流程，并同步 README/AGENTS 的文档入口。 | 不写愿景或未落地方案；结构校验和事实回查之外，还要检查读者能否理解模块职责、找到入口并完成适用操作。 |
-| `project-handover-analyzer` | 形成完整项目或多仓交付包的接手报告。 | 基于完整项目或多仓交付包的源码、配置、构建和部署材料，按稳定的 14 章骨架生成可复核的接手分析报告，覆盖总体功能、技术与部署架构、模块依赖、交付完整性、典型调用链、风险和接手路线，并保留环境准备、代表性操作、结果检查和失败定位路径。 | 用于全局接手，不替代单模块架构、单业务闭环或代码变更审查；区分支持方案与环境快照，未实际运行的步骤标明验证状态。 |
+| `project-handover-analyzer` | 形成完整项目或多仓交付包的接手报告。 | 基于完整项目或多仓交付包的源码、配置、构建和部署材料，按模块判断与接手路径的默认骨架生成可复核的接手分析报告，覆盖总体功能、技术与部署架构、模块依赖、交付完整性、典型调用链、风险和接手路线，并保留环境准备、代表性操作、结果检查和失败定位路径。 | 用于全局接手，不替代单模块架构、单业务闭环或代码变更审查；区分支持方案与环境快照，未实际运行的步骤标明验证状态。 |
 | `project-readme-generator` | 生成或重构面向使用者和开发者的项目入口文档。 | 基于仓库事实和实际命令验证，按核心信息、条件内容和结构校验生成、重构或优化项目 `README.md`。 | README 中推荐的常规命令必须实际验证，结构和链接必须通过检查。 |
 
 ### 审查与业务分析
 
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
-| `agent-auto-commit-audit` | 对 Agent-Auto 提交进行多维度审查和安全修复。 | 审查并修复 Agent-Auto 提交范围内的代码、业务闭环、页面体验和相关文档，并输出带引用依据的审查报告。 | 先锁定提交范围；只自动修复无业务歧义的问题，并引用各审查方向的规则依据；邮件交付须由用户明确要求。 |
 | `backend-memory-risk-report` | 识别后端内存泄漏、溢出和异常增长风险。 | 分析 Java/Spring 等后端代码中的内存溢出、泄漏和异常增长风险，并输出结构化检查报告。 | 缺少运行时证据时只能标记为潜在或疑似风险，不能表述为已确认故障。 |
 | `business-closed-loop-flow-analyzer` | 还原单个已实现业务功能的端到端运行链路。 | 基于当前代码、数据结构和配置还原单个已实现业务功能从入口到终态的闭环流程，重点覆盖参与者、状态、数据权限、表关系、字段赋值和核心代码证据。 | 只分析已落地功能；未实现需求、当前改动核查和模块架构应使用对应技能。 |
 | `business-feature-audit` | 判断当前改动放回业务链路后是否完整成立。 | 对当前改动做业务闭环核查，检查流程、状态、权限、上下游协同和数据一致性是否成立。 | 不替代页面 UX、DESIGN 合规或前端复用审查；写入报告前需确认范围。 |
@@ -109,7 +107,6 @@
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `ai-trend-knowledge-maintainer` | 筛选 AI 趋势信息并维护知识库及元数据。 | 维护 AI 趋势投资知识库，处理候选信息、正式文档、元数据和校验闭环。 | 新信息默认先进入候选池；正式更新必须满足证据门槛并同步索引、状态和更新记录。 |
-| `five-dim-stock-analysis` | 从五个维度评估上市公司质量、估值和风险。 | 基于可追溯公开数据完成上市公司五维质量分析、15 项评分、估值与建仓情景，以及有完整基线时的季报增量跟踪；以 A 股为主要覆盖范围。 | 优先核对最新官方披露；证据不足时标记 `N/A`，不得强行评分或输出价格与仓位。 |
 
 ## 使用方式
 
@@ -117,26 +114,24 @@
 2. 如果想明确触发某个技能，可以在需求中直接点名技能名称或表达对应任务目标。
 3. 使用前优先检查对应目录下的 `SKILL.md`，必要时补充 `references/`、模板或脚本资源。
 4. 新增技能时，至少创建 `技能目录/SKILL.md`，写清名称、用途、触发条件、执行步骤和边界约束。
-5. 技能调用策略须在 `SKILL.md`、`agents/openai.yaml` 和 README 中保持一致；仅显式调用的技能注明点名条件，自动调用的技能写清适用意图与边界。`auto-plan-dev` 支持自动调用，`development-trace` 仍仅显式调用。
+5. 技能调用策略须在 `SKILL.md`、`agents/openai.yaml` 和 README 中保持一致；仅显式调用的技能注明点名条件，自动调用的技能写清适用意图与边界。`auto-plan-dev` 支持自动调用。
 6. 需求协作按阶段选择技能：闭环补齐业务链路，需求文档固化可验收契约，原型表达页面与模拟交互，开发计划承接实现与验证；完成当前阶段不自动启动下一阶段。
 7. 四个技能共用 [需求协作契约](requirement-doc-generator/references/workflow-contract.md)，维护事实继承、确认、草案保存、已有文件复用及阶段条目粒度；通用结构选择引用 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md#模板与结构选择)。闭环、需求和计划使用默认骨架，不得把适用功能点、任务或验证记录压成概述。
 8. HTML/结构图原型的选择、制作与验证规则由 [page-prototype-designer](page-prototype-designer/SKILL.md) 维护；需求技能负责页面范围与引用，计划按普通/专业模式处理前置、读取实际产物或明确的替代依据，不重做已确认原型。
 9. 需求编号与验收契约由 [requirement-doc-generator](requirement-doc-generator/SKILL.md) 维护；任务状态与需求汇总由 [auto-plan-dev](auto-plan-dev/SKILL.md) 维护，不用计划覆盖程度代替实际完成。
 10. 页面复用、组件/布局配置接入按计划技能和项目真实机制确定；自动接入不重复登记，无平台不为模板新增体系，基础能力需真实样板与消费验证。
-11. 性能、安全与兼容内容按风险展开：需求维护目标及边界，计划维护实现、验证和发布安排；实际证据在已有实施记录维护。`development-trace` 仍仅在其显式调用条件满足时使用，不捆绑创建。
+11. 性能、安全与兼容内容按风险展开：需求维护目标及边界，计划维护实现、验证和发布安排；实际证据在已有实施记录维护。
 12. 前端任务按上方“前端设计与体验治理”表选择技能；各维度保留独立判据，同根因问题合并报告，已有有效证据共享使用。
 13. `business-feature-audit` 只负责业务闭环、状态流转、上下游协同和前端业务承接，不替代页面 UX、DESIGN 合规或前端复用治理；涉及这些问题时应转交对应前端审查技能。
 14. 需要还原已实现的单个业务功能从入口、鉴权、筛数、写表、状态推进到终态的实际运行链路时，使用 `business-closed-loop-flow-analyzer`；尚未落地的目标流程交给 `requirement-closure-designer`，当前改动核查交给 `business-feature-audit`，整个模块或技术子系统说明交给 `module-architecture-doc-generator`。
 15. `frontend-design` 同时支持整体设计与局部呈现修改；遵循当前产品和设计系统，不因调用技能自动扩大范围或启动全站专项审核。
-16. 分析上市公司质量、估值、风险、评分或建仓情景时，可使用 `five-dim-stock-analysis`；完整分析必须先核对数据质量和最新官方报告，季报增量跟踪必须有可用的完整分析基线，证据不足的评分项和价格区间不得强行补值。
-17. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-setup-assistant`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
-18. 需要按 Git 提交范围审查近期 AI 自动开发结果时，使用 `agent-auto-commit-audit`；它负责串联代码审查、业务闭环核查、页面审查、必要修复和文档同步，不替代单独的技能开发或常规提交消息生成。报告默认在最终回复或用户指定的本地文档中交付；仅当用户明确要求时，才处理邮件正文、草稿或发送及对应条件检查。
-19. 涉及 Git 提交文案生成时，使用 `git-commit-msg`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-msg` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
-20. 需要实际执行 Git 提交与推送时，使用 `git-push`，并由其内部调用 `git-commit-msg` 生成提交文案，复用已确定的范围；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
-21. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
-22. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analyzer`；它默认按稳定的 14 章骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `module-architecture-doc-generator`，单项已实现业务闭环继续使用 `business-closed-loop-flow-analyzer`。
-23. 使用 `module-architecture-doc-generator` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
-24. 排查磁盘空间或电脑卡顿时，分别使用 `disk-usage-report` 或 `process-usage-report`，默认只读采样并说明测量限制；实际清理前必须读取 [清理安全规则](disk-usage-report/references/cleanup-safety.md)，处理进程前重新核对目标身份与影响，并按技能要求取得明确授权。
+16. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-setup-assistant`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
+17. 涉及 Git 提交文案生成时，使用 `git-commit-msg`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-msg` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
+18. 需要实际执行 Git 提交与推送时，使用 `git-push`，并由其内部调用 `git-commit-msg` 生成提交文案，复用已确定的范围；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
+19. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `sync-codex-config`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权执行正式同步；Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，不会删除目标端独有技能、文件或其他安装配置，并且要显式排除所有 MCP 相关技能。
+20. 需要快速接手、盘点或评估整个项目及多仓交付包时，使用 `project-handover-analyzer`；它按模块判断与接手路径的默认骨架输出完整单文档，负责总体功能、运行与部署拓扑、跨模块依赖、交付完整性、典型调用链和接手路线。单个模块的详细架构继续使用 `module-architecture-doc-generator`，单项已实现业务闭环继续使用 `business-closed-loop-flow-analyzer`。
+21. 使用 `module-architecture-doc-generator` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
+22. 排查磁盘空间或电脑卡顿时，分别使用 `disk-usage-report` 或 `process-usage-report`，默认只读采样并说明测量限制；实际清理前必须读取 [清理安全规则](disk-usage-report/references/cleanup-safety.md)，处理进程前重新核对目标身份与影响，并按技能要求取得明确授权。
 
 ## 文档输出规则入口
 
@@ -147,10 +142,10 @@
 | 默认骨架，继承阶段信息粒度 | `requirement-closure-designer`、`requirement-doc-generator`、`auto-plan-dev` | [共用契约](requirement-doc-generator/references/workflow-contract.md)及各阶段条目模板 |
 | 按原型形式承载 | `page-prototype-designer` | [原型技能](page-prototype-designer/SKILL.md)：结构图用默认骨架，HTML 用页面和交互契约 |
 | 参考结构，最低内容必需 | `ai-constraint-doc-generator`、`project-readme-generator`、`module-architecture-doc-generator`、`business-closed-loop-flow-analyzer`、`project-design-md-generator` | 各技能的输出契约或结构参考；结构校验与内容核对分开 |
-| 默认报告骨架，保留逐项证据与状态 | `development-trace`、`backend-memory-risk-report`、`business-feature-audit`、`agent-auto-commit-audit`、`design-compliance-audit`、`page-ux-audit` | 各技能的报告模板与输出要求 |
+| 默认报告骨架，保留逐项证据与状态 | `backend-memory-risk-report`、`business-feature-audit`、`design-compliance-audit`、`page-ux-audit` | 各技能的报告模板与输出要求 |
 | 参考结构，按请求范围输出 | `disk-usage-report`、`process-usage-report`、`code-reviewer`、`frontend-reuse-enforcer`、`frontend-design` | 各技能的报告、反馈或方案要求；不自动落盘 |
-| 默认正文骨架与局部固定契约并存 | `five-dim-stock-analysis`、`ai-trend-knowledge-maintainer` | 报告/季度模板、评分契约；类别模板、元数据与机器校验契约 |
-| 完整模式固定 14 个主章节及顺序 | `project-handover-analyzer` | [接手报告模型](project-handover-analyzer/references/handover-report-model.md)，用户指定摘要或专项范围时按其要求 |
+| 默认正文骨架与局部固定契约并存 | `ai-trend-knowledge-maintainer` | 类别模板、元数据与机器校验契约 |
+| 默认骨架，按模块与接手动作整合 | `project-handover-analyzer` | [接手报告模型](project-handover-analyzer/references/handover-report-model.md)，用户指定摘要或专项范围时按其要求 |
 | 维护或委派文档，沿用原契约 | `ai-instruction-simplifier`、`automation-setup-assistant`、`sync-codex-config` | 精简保留核心要求；自动化引用业务技能；同步仅适配目标路径 |
 | 专用产物，不套通用报告 | `git-commit-msg`、`git-push`、`sync-project-mcp` | 提交消息由 `git-commit-msg` 的 A/B 契约维护；MCP 保留配置字段、协议及结果分类 |
 

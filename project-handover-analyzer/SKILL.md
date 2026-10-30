@@ -7,7 +7,7 @@ description: 基于项目源码、配置、构建与部署材料生成可复核�
 
 ## 职责与边界
 
-本文维护全局接手分析流程与授权边界；项目发现、证据判定、报告模型及固定 14 章产物骨架由下述资源维护，不将技能正文六章作为产物模板。
+本文维护全局接手分析流程与授权边界；项目发现、证据判定、报告模型及默认产物骨架由下述资源维护，不将技能正文六章作为产物模板。
 
 ### 目标
 
@@ -33,7 +33,7 @@ description: 基于项目源码、配置、构建与部署材料生成可复核�
 - [references/project-discovery.md](references/project-discovery.md)：项目边界、事实源和跨技术栈发现方法。
 - [references/handover-report-model.md](references/handover-report-model.md)：接手报告应回答的问题和表达模型。
 - [references/evidence-completeness-security.md](references/evidence-completeness-security.md)：证据等级、完整性判定、安全与质量门禁。
-- [assets/project-handover-report-template.md](assets/project-handover-report-template.md)：与完整分析模式一致的 14 章 Markdown 输出骨架。
+- [assets/project-handover-report-template.md](assets/project-handover-report-template.md)：以模块判断和接手路径组织的完整 Markdown 输出骨架。
 - `scripts/scan_project_handover.py`：只读项目清单扫描器，支持 Markdown 和 JSON 输出。
 
 ## 执行流程
@@ -66,12 +66,12 @@ description: 基于项目源码、配置、构建与部署材料生成可复核�
 5. 生成接手报告。
    - 阅读 [references/handover-report-model.md](references/handover-report-model.md)。
    - 以 [assets/project-handover-report-template.md](assets/project-handover-report-template.md) 为报告起始骨架，按项目事实填充内容；交付前删除全部花括号占位符、示例节点和 HTML 注释。
-   - 默认生成一份完整的项目级单文档，使用参考文档规定的 14 章骨架；不得把它压缩成只有技术栈、模块表和风险矩阵的简版报告。
+   - 默认生成一份完整的项目级单文档，使用参考文档规定的默认骨架；不得把它压缩成只有技术栈、模块表和风险矩阵的简版报告。
    - 输出位置按顺序选择：用户指定路径、项目已有同类报告、`agent-works/architecture/project-handover-report.md`。
    - 更新已有同类报告时保留仍成立的事实，删除与当前代码冲突的旧结论；不要创建重复报告。
-   - 默认保留“一页结论、代码包全景、总体功能、技术架构、部署架构、模块职责、依赖关系、客户端结构、完整性、典型调用链、接手路线、交付方问题、证据入口、最后建议”等独立信息区。
+   - 以模块和接手动作组织判断；功能、代码包、架构、依赖、客户端、完整性、调用链、证据与交付方问题按报告模型归入所属对象，保留全部适用内容。
    - 复杂关系使用 Mermaid，精确清单和评估结果使用表格；简单关系用文字。多服务项目至少包含总体运行图、构建或运行依赖图和核心调用时序图。
-   - 项目确实不具备某类内容时，在对应章节写明“不适用”和依据；不要静默删除核心章节。用户明确要求精简版时才调整为摘要结构。
+   - 项目确实不具备某类核心内容时，在对应判断位置说明“不适用”和依据；未知不得省略。章节可合并，只有用户明确要求摘要时才降低完整报告的信息粒度。
 
 6. 验证和交付。
    - 回查报告中的关键路径、命令、模块名、端口、版本、API、表、配置键和依赖方向。
@@ -95,11 +95,11 @@ description: 基于项目源码、配置、构建与部署材料生成可复核�
 
 首次生成或获准补全文档时落实下述产物边界；仅保存、逐字保存或局部更新沿用有效基线，不为补边界扩写或重排，范围外缺口在交付中说明。
 
-按工作方式第 5 步生成或更新一份完整报告并维护既有路径；明确摘要请求时才改变完整报告结构。交付绝对路径、范围、验证状态与交付方待答问题，不自动修复、部署或提交。
+按工作方式第 5 步生成或更新一份完整报告并维护既有路径；按模型调整组织，明确摘要请求时才缩减完整报告粒度。交付绝对路径、范围、验证状态与交付方待答问题，不自动修复、部署或提交。
 
 ### 产出文档边界
 
-文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。接手报告说明指定版本或交付包的整体能力、架构、交付完整性、风险与接手路径；它是评估快照，详细模块契约和长期运维操作仍由对应文档维护。边界可置于开头范围说明，不改变既有 14 章编号。
+文档边界遵循 [全局规范](~/ai-agent-config/config/force/document-boundaries.md)。接手报告说明指定版本或交付包的整体能力、架构、交付完整性、风险与接手路径；它是评估快照，详细模块契约和长期运维操作仍由对应文档维护。边界可置于开头范围说明；既有报告局部更新保留原编号。
 
 ## 验证与完成标准
 

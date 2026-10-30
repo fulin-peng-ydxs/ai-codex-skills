@@ -7,7 +7,7 @@ description: 基于项目当前代码、数据结构和配置，还原单个业�
 
 ## 职责与边界
 
-本文维护事实追踪流程与分析边界；[输出契约](references/output-contract.md) 维护产物最低内容，[数据权限运行规则](references/data-permission-runtime.md) 维护权限链路检查要求。
+本文维护事实追踪流程与分析边界；产物以业务环节串联行为、权限、数据和复核依据，[输出契约](references/output-contract.md) 维护产物最低内容，[数据权限运行规则](references/data-permission-runtime.md) 维护权限链路检查要求。
 
 ### 核心定位
 
