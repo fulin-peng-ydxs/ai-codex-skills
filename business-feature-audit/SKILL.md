@@ -9,7 +9,7 @@ description: 对当前会话或当前 Git 工作区中本次开发涉及的代�
 
 对本次开发涉及的代码做业务闭环核查。目标不是重复做普通代码审查，而是判断这次改动放回业务模块和完整链路后，整体功能是否成立，是否有未充分考虑的问题。
 
-本文维护模式、范围、确认与证据规则；具体核查维度在 [核查清单](references/audit-dimensions.md) 维护，输出前读取 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md) 的“面向读者的组织与审阅”；正式产档时读取 [报告模板](references/report-template.md)。
+本文维护模式、范围、确认与证据规则；具体核查维度在 [核查清单](references/audit-dimensions.md) 维护；报告按下文“报告组织”要求编写，正式产档时读取 [报告模板](references/report-template.md)。
 
 ### 适用范围
 
