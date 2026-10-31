@@ -16,9 +16,9 @@ MAX_BYTES = 15_000_000  # Decimal MB; exactly this size is allowed.
 
 
 def git(repo, *args):
-    """Inspect the selected repository without optional Git index writes."""
+    """Read real Git objects, ignoring replacement refs and optional index writes."""
     result = subprocess.run(
-        ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(repo), *args],
+        ["git", "--no-replace-objects", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(repo), *args],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
     if result.returncode:

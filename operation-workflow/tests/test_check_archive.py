@@ -67,6 +67,23 @@ class ArchiveTests(unittest.TestCase):
         self.stage(ROOT)
         self.assertTrue(GATE.check_index(self.repo, ROOT)["errors"])
 
+    def test_replacement_refs_do_not_change_indexed_blob_size(self):
+        relative = f"{ROOT}/servers/prod-a/rootfs/etc/config"
+        for original_size, replacement_size in [(15_000_001, 1), (1, 15_000_001)]:
+            with self.subTest(original_size=original_size):
+                self.file(relative, original_size)
+                self.stage(ROOT)
+                original = self.git("ls-files", "--stage", "--", relative).split()[1].decode()
+                replacement_file = self.file("replacement", replacement_size)
+                replacement = self.git("hash-object", "-w", str(replacement_file)).strip().decode()
+                self.git("replace", original, replacement)
+                try:
+                    report = GATE.check_index(self.repo, ROOT)
+                    self.assertEqual(original_size, report["files"][0]["size_bytes"])
+                    self.assertEqual(original_size > GATE.MAX_BYTES, bool(report["errors"]))
+                finally:
+                    self.git("replace", "-d", original)
+
     def test_symlink_and_fifo_are_not_opened(self):
         relative = f"{ROOT}/servers/prod-a/rootfs/etc/link"
         path = self.repo / relative
