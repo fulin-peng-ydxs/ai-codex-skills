@@ -62,6 +62,8 @@ description: 生成或重构项目级 AI 通用约束文档，包括 AGENTS.md �
 
 ## 验证与完成标准
 
+文档校验器共用同级 `ai-constraint-doc-authoring/scripts/document_markdown.py` 解析 Markdown，专属字段与结构仍由各自校验器判断。安装或局部同步本技能时须同时提供该依赖；缺失时校验器明确报错，不回退到复制实现。修改共用解析器后运行 `python3 -m unittest discover -s <本技能目录>/tests -p 'test_*.py'`，测试需同级安装 README 和架构文档技能，以覆盖三个消费方。
+
 - 写入前确认适用命令门禁通过；写入后重读文件，核对规则归属、命令及其验证状态、事实来源和是否混入样例项目内容。
 - 检查入口能否引导后续 Agent 定位并选择事实源，检查链接及受标题变化影响的仓库内锚点；局部更新核对原有有效信息和确认状态没有被扩大或覆盖。
 - 运行 `scripts/validate_ai_constraint_docs.py <repo-root> --custom-structure --document <agents|claude|both>`，按本次交付范围选择文件；省略 `--document` 时兼容原有双文件校验，所选文件缺失仍报错，不为通过检查新增未授权文件。默认用 `--custom-structure` 检查正文、空章节、占位内容和 CLAUDE 薄入口边界，不要求二级标题；只有明确采用内置骨架时才省略该参数并检查固定标题与顺序。外部固定契约和最低内容另行核对。
