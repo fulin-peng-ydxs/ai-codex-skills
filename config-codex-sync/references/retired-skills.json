@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "skills": {
+    "agent-auto-commit-audit": {
+      "deletion_commit": "bba29c06307c9fdae2db1cd5de8f4daaadf2de68",
+      "baselines": [
+        {
+          "revision": "1efbfc87eb294cb2fb8d0f4356af28d784fa4f7e",
+          "snapshot": {
+            ".": "dir",
+            "SKILL.md": "sha256:b517da6e259079a8c42844aacd7c18ed588bc0faad7311fb0fbd3bcbd8c75339",
+            "agents/openai.yaml": "sha256:f8155aa8b891cb39bfba6543b81acc159918e3324c40f9f583a5f91ad5b8bc09",
+            "agents": "dir"
+          }
+        }
+      ]
+    },
+    "development-trace": {
+      "deletion_commit": "bba29c06307c9fdae2db1cd5de8f4daaadf2de68",
+      "baselines": [
+        {
+          "revision": "1efbfc87eb294cb2fb8d0f4356af28d784fa4f7e",
+          "snapshot": {
+            ".": "dir",
+            "SKILL.md": "sha256:bea1db25c816f23d6de74d49d321cd665ee5d3b63406ca734d7ee4a79da6d605",
+            "agents/openai.yaml": "sha256:20be3d71f3bcb63b8baa81cca539e9de4521c615f866ef7c5fabb6bcba8bd3f0",
+            "agents": "dir",
+            "references/output-template.md": "sha256:85c4338dcd8c25f474d3ac70272536286c00a34606597e4cf9999b7ca7959cc1",
+            "references": "dir"
+          }
+        },
+        {
+          "revision": "4cfb292dcca0838893f4fbd2270b32e52edb2254",
+          "snapshot": {
+            ".": "dir",
+            "SKILL.md": "sha256:e412af9bb861aa574bc15b10bcd0b9d72a4a31eb6938b446ef93520a19ff5d36",
+            "agents/openai.yaml": "sha256:20be3d71f3bcb63b8baa81cca539e9de4521c615f866ef7c5fabb6bcba8bd3f0",
+            "agents": "dir"
+          }
+        }
+      ]
+    },
+    "five-dim-stock-analysis": {
+      "deletion_commit": "bba29c06307c9fdae2db1cd5de8f4daaadf2de68",
+      "baselines": [
+        {
+          "revision": "1efbfc87eb294cb2fb8d0f4356af28d784fa4f7e",
+          "snapshot": {
+            ".": "dir",
+            "SKILL.md": "sha256:f486705810d554f31862fc2a04c6e66a78bd6bd8f84e1118621295f31df67a84",
+            "agents/openai.yaml": "sha256:152d117cd1ef9c83ed7f706abaab339213aa9c3ac2c5828386cc1ca5892149c0",
+            "agents": "dir",
+            "references/methodology.md": "sha256:9c6ba9773b40348cad4caa533cc69ed97bfeb179033072bdb26090e4688aada1",
+            "references": "dir",
+            "references/public-data-sources.md": "sha256:12d27c5c3963464bbfdb99486d22129519b8c77d55ff862deccffb422c45095e",
+            "references/quarterly-tracking.md": "sha256:4a12b4458b072c587ee3805b56075379d175d11299b8d3fa25bcef5d292742b7",
+            "references/report-templates.md": "sha256:2dba3addd0085ae708d0c935340100fa139a679a9c4593bd8e6deb87ada28b80",
+            "scripts/collect_a_share_data.py": "sha256:5abe8efe601491d5956978a22e472e9c8c64329b278eb6532cb56ccef003e246",
+            "scripts": "dir"
+          }
+        },
+        {
+          "revision": "4cfb292dcca0838893f4fbd2270b32e52edb2254",
+          "snapshot": {
+            ".": "dir",
+            "SKILL.md": "sha256:5b17543c5dd8d7e6c6affe24b62aacceaec45a62af01636156c1aa708541d723",
+            "agents/openai.yaml": "sha256:152d117cd1ef9c83ed7f706abaab339213aa9c3ac2c5828386cc1ca5892149c0",
+            "agents": "dir",
+            "references/methodology.md": "sha256:9c6ba9773b40348cad4caa533cc69ed97bfeb179033072bdb26090e4688aada1",
+            "references": "dir",
+            "references/public-data-sources.md": "sha256:12d27c5c3963464bbfdb99486d22129519b8c77d55ff862deccffb422c45095e",
+            "references/quarterly-tracking.md": "sha256:afd3764a9b58ef49dcec6f4718dc7e07c0c6135e87c3e9f164a6de50b9f7dee5",
+            "references/report-templates.md": "sha256:a6556f93a1a25f73449c28eff021e52b14a97ab645b5b6457dcf2072723a3600",
+            "scripts/collect_a_share_data.py": "sha256:5abe8efe601491d5956978a22e472e9c8c64329b278eb6532cb56ccef003e246",
+            "scripts": "dir"
+          }
+        }
+      ]
+    },
+    "investment-ai-trend-knowledge-maintenance": {
+      "deletion_commit": "01f042489f39abd698578437652e78f10844de63",
+      "baselines": [
+        {
+          "revision": "525be18de3cb0e972e590a86562948a4106d44ff",
+          "snapshot": {
+            ".": "dir",
+            "SKILL.md": "sha256:42476f9c1defe2418c58d0cfc8f9993a41e2904dbcaf8c9f95a74122ddf23b6f",
+            "agents/openai.yaml": "sha256:850872644228d0226bae5b83ebd0c89eb63a1dc93c0562e2455589ba34a20fa9",
+            "agents": "dir",
+            "references/direction-management.md": "sha256:672b32842721b2c632f973b933ac41b72f222b1a6801618f07fab7135b842044",
+            "references": "dir",
+            "references/document-contract.md": "sha256:1003cc01813ca2030684e046d3faee59129352e74c33d46cc0a666d894850a4f",
+            "references/update-policy.md": "sha256:3627eec6b8b9ba3ddb97f57de30e1333f07014641d060b0d953ee27178a38bdf",
+            "scripts/validate_repo.sh": "sha256:6f72bcac82d33762f8a1b1f535f708edbce9d56250f90d4c25f5a4308cfdd027",
+            "scripts": "dir"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -15,7 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-CODEX_ONLY_SKILLS = {"automation-management"}
+STATE_FILE = ".codex-skill-sync.json"
+RETIREMENTS = Path(__file__).resolve().parents[1] / "references/retired-skills.json"
+
+CODEX_ONLY_SKILLS = {"automation-management", "config-codex-sync"}
 
 
 IGNORED_NAMES = {
@@ -80,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--kimi-root",
         type=expand_path,
-        default=default_root("KIMI_CODE_HOME", "~/.kimi-code"),
+        default=default_root("KIMI_CODE_HOME", "~/.agents"),
         help="Kimi Code 用户根目录。",
     )
     parser.add_argument(
@@ -90,8 +95,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--delete", action="store_true",
-        help="同名技能清理：仅删除同名技能内多余文件；保留目标独有技能、MCP、Codex 专属技能、隐藏项和符号链接。",
+        help="按同步基线清理多余文件和已退役的受管技能；保留独有、修改冲突及排除项。",
     )
+    parser.add_argument("--origin-root", type=expand_path, help="稳定的完整 Codex 根目录；使用临时适配源时必须指定。")
+    parser.add_argument("--partial", action="store_true", help="仅同步所选技能，不据缺失推断整项退役。")
     return parser.parse_args()
 
 
@@ -183,6 +190,127 @@ def apply_deletions(paths: list[Path]) -> None:
             path.rmdir()
         else:
             path.unlink()
+
+
+def tree_snapshot(path: Path, source: bool = False) -> dict[str, str]:
+    """Hash regular files without following symlinks; include empty directories."""
+    result = {}
+    def walk(item: Path, key: str):
+        if source and (item.name in IGNORED_NAMES or item.suffix == ".pyc"):
+            return
+        if item.is_symlink():
+            result[key] = "link:" + os.readlink(item)
+        elif item.is_dir():
+            result[key] = "dir"
+            for child in sorted(item.iterdir()):
+                walk(child, child.name if key == "." else key + "/" + child.name)
+        elif item.is_file():
+            result[key] = "sha256:" + hashlib.sha256(item.read_bytes()).hexdigest()
+        else:
+            result[key] = "special"
+    if path.exists() or path.is_symlink():
+        walk(path, ".")
+    return result
+
+
+def validate_inventory(inventory: dict) -> None:
+    """Treat persisted path data as untrusted, never as an arbitrary delete path."""
+    if not isinstance(inventory, dict):
+        raise SyncError("无效的技能管理清单")
+    for name, snapshot in inventory.items():
+        if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", name):
+            raise SyncError("清单技能名不合法")
+        if not isinstance(snapshot, dict) or "." not in snapshot:
+            raise SyncError("清单缺少技能根对象")
+        for key, value in snapshot.items():
+            if not isinstance(key, str) or (key != "." and ("\\" in key or any(part in ("", ".", "..") for part in key.split("/")))):
+                raise SyncError("清单路径不合法")
+            if not isinstance(value, str) or not (value in ("dir", "special") or value.startswith("link:") or re.fullmatch(r"sha256:[0-9a-f]{64}", value)):
+                raise SyncError("清单哈希不合法")
+
+
+def load_state(target: Path, origin: Path) -> dict:
+    path = target / STATE_FILE
+    if path.is_symlink():
+        raise SyncError("管理清单不能是符号链接")
+    if not path.exists():
+        return {"schema_version": 1, "origin": str(origin), "managed": {}}
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or data.get("schema_version") != 1 or data.get("origin") != str(origin):
+        raise SyncError("管理清单版本或源身份不匹配；禁止重建基线绕过冲突")
+    validate_inventory(data.get("managed"))
+    return data
+
+
+def write_state(target: Path, state: dict) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    fd, filename = tempfile.mkstemp(prefix=".codex-skill-sync-", dir=target)
+    temporary = Path(filename)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump(state, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+        os.replace(temporary, target / STATE_FILE)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def load_retirements() -> dict:
+    data = json.loads(RETIREMENTS.read_text())
+    if data.get("schema_version") != 1 or not isinstance(data.get("skills"), dict):
+        raise SyncError("退役登记无效")
+    for name, entry in data["skills"].items():
+        if not isinstance(entry, dict) or not isinstance(entry.get("baselines"), list):
+            raise SyncError("退役登记缺少基线")
+        for baseline in entry["baselines"]:
+            validate_inventory({name: baseline["snapshot"]})
+    return data["skills"]
+
+
+def managed_deletions(source: Path, target: Path, state: dict, retirements: dict, partial: bool, origin_skills: Path | None = None):
+    """Use trusted ownership baselines; unknown or changed data never auto-deletes."""
+    managed = state["managed"]
+    paths, conflicts, retired, guards = [], [], set(), {}
+    for path in plan_deletions(source, target):
+        relative = path.relative_to(target)
+        name = relative.parts[0]
+        key = "/".join(relative.parts[1:]) or "."
+        current = tree_snapshot(path).get(".")
+        baseline = managed.get(name, {}).get(key)
+        if current == "dir":
+            # Only remove empty directories whose complete contents are approved.
+            descendants = list(path.rglob("*"))
+            if baseline == "dir" and all(child in paths for child in descendants):
+                paths.append(path)
+        elif baseline == current and current and current.startswith("sha256:"):
+            paths.append(path)
+            guards[path] = tree_snapshot(path)
+        else:
+            conflicts.append(f"{path}: 无同步基线或目标已修改，保留")
+    if not partial:
+        for name in sorted(set(managed) | set(retirements)):
+            src, dest = source / name, target / name
+            canonical = (origin_skills or source) / name
+            if canonical.exists() or canonical.is_symlink():
+                continue
+            if src.exists() or src.is_symlink():
+                continue
+            if not dest.exists() and not dest.is_symlink():
+                retired.add(name)
+                continue
+            if is_excluded_mcp_skill(dest) or is_codex_only_skill(dest):
+                continue
+            current = tree_snapshot(dest)
+            baselines = [managed[name]] if name in managed else [x["snapshot"] for x in retirements[name]["baselines"]]
+            protected = any(protected_entry(dest / key) for key in current if key != ".") or protected_entry(dest)
+            if current not in baselines or protected or "special" in current.values():
+                conflicts.append(f"{dest}: 退役副本与基线不一致或含受保护项，保留")
+                continue
+            guards[dest] = current
+            paths.extend(sorted((dest / key for key in current if key != "."), key=lambda p: len(p.parts), reverse=True))
+            paths.append(dest)
+            retired.add(name)
+    return paths, conflicts, retired, guards
 
 
 def has_skill_frontmatter(path: Path) -> bool:
@@ -360,25 +488,39 @@ def main() -> int:
     targets = selected_targets(args)
     try:
         validate_paths(args.codex_root, targets)
+        origin = args.origin_root or args.codex_root
+        if not (origin / "skills").is_dir():
+            raise SyncError("完整源目录不存在")
+        origin_skills, _ = discover_skills(origin / "skills")
         source_skills_root = args.codex_root / "skills"
         source_agents = args.codex_root / "AGENTS.md"
         skills, excluded_skills = discover_skills(source_skills_root)
         if not skills:
             raise SyncError(f"未发现可同步技能：{source_skills_root}")
 
+        names = {p.name for p in skills}
+        origin_names = {p.name for p in origin_skills}
+        if (not args.partial and names != origin_names) or not names <= origin_names:
+            raise SyncError("适配源集合与完整源不一致；局部同步必须使用 --partial")
+        retirements = load_retirements()
+        states, conflicts, retired, guards = {}, {}, {}, {}
         # Validate all writes and compute all deletions before mutating any target.
         deletion_plans = {}
         for label, target_root in targets:
             for skill in skills:
                 sync_entry(skill, target_root / "skills" / skill.name, True)
             sync_document(source_agents, target_root / target_document_name(label), True)
-            deletion_plans[label] = plan_deletions(source_skills_root, target_root / "skills") if args.delete else []
+            states[label] = load_state(target_root, origin)
+            if args.delete:
+                deletion_plans[label], conflicts[label], retired[label], guards[label] = managed_deletions(source_skills_root, target_root / "skills", states[label], retirements, args.partial, origin / "skills")
+            else:
+                deletion_plans[label], conflicts[label], retired[label], guards[label] = [], [], set(), {}
 
         mode = "预览" if args.dry_run else "执行"
         print(f"模式：{mode}")
         print(f"Codex 源：{args.codex_root}")
         print(f"发现技能：{len(skills)}")
-        print(f"同步方式：{'同名技能清理（保留目标独有技能）' if args.delete else '增量（保留目标独有项）'}")
+        print(f"同步方式：{'按管理清单清理（含退役技能）' if args.delete else '增量（保留目标独有项）'}")
         if excluded_skills:
             excluded_names = "、".join(skill.name for skill in excluded_skills)
             print(f"排除技能（MCP 或 Codex 专属）：{len(excluded_skills)}（{excluded_names}）")
@@ -386,6 +528,12 @@ def main() -> int:
         for label, target_root in targets:
             for path in deletion_plans[label]:
                 print(f"{label} 待删除：{path}")
+            for conflict in conflicts[label]:
+                print(f"{label} 冲突：{conflict}")
+            if not args.dry_run:
+                for path, snapshot in guards[label].items():
+                    if tree_snapshot(path) != snapshot:
+                        raise SyncError(f"删除前目标已变化：{path}")
             skill_counts = Counts()
             for skill in skills:
                 skill_destination = target_root / "skills" / skill.name
@@ -402,14 +550,31 @@ def main() -> int:
                 source_agents, target_root / document_name, args.dry_run
             )
             if not args.dry_run:
+                # Recheck immediately before removal, after synchronization writes.
+                for path, snapshot in guards[label].items():
+                    if tree_snapshot(path) != snapshot:
+                        raise SyncError(f"删除前目标已变化：{path}")
                 apply_deletions(deletion_plans[label])
+                managed = states[label]["managed"]
+                for name in retired[label]:
+                    managed.pop(name, None)
+                for skill in skills:
+                    baseline = managed.setdefault(skill.name, {})
+                    # Keep pending removed-file baselines until a later --delete.
+                    baseline.update(tree_snapshot(skill, source=True))
+                    dest = target_root / "skills" / skill.name
+                    for key in list(baseline):
+                        item = dest if key == "." else dest / key
+                        if not item.exists() and not item.is_symlink():
+                            del baseline[key]
+                write_state(target_root, states[label])
             print(
                 f"{label}：{target_root} | "
                 f"技能新增 {skill_counts.created}、更新 {skill_counts.updated}、"
                 f"未变化 {skill_counts.unchanged} | 删除项 {len(deletion_plans[label])} | {document_name} {document_status}"
             )
-        return 0
-    except (OSError, SyncError) as error:
+        return 2 if any(conflicts.values()) else 0
+    except (OSError, SyncError, ValueError, KeyError, TypeError) as error:
         print(f"错误：{error}", file=sys.stderr)
         return 1
 

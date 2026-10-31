@@ -16,23 +16,24 @@ SPEC.loader.exec_module(SYNC_MODULE)
 
 
 class DiscoverSkillsTest(unittest.TestCase):
-    def test_codex_automation_excluded_from_sync_and_cleanup(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source, target = root / "source", root / "target"
-            for base in [source, target]:
-                base.mkdir()
-                for name in ["automation-management", "portable", "alias"]:
-                    folder = base / name
-                    folder.mkdir()
-                    identity = "automation-management" if name == "alias" else name
-                    (folder / "SKILL.md").write_text(f"---\nname: '{identity}'\ndescription: Codex workflow\n---\n")
-                (base / "automation-management.md").write_text("---\nname: automation-management\ndescription: test\n---\n")
-            (target / "automation-management" / "old.txt").write_text("keep")
-            included, excluded = SYNC_MODULE.discover_skills(source)
-            self.assertEqual(["portable"], [p.name for p in included])
-            self.assertEqual({"automation-management", "automation-management.md", "alias"}, {p.name for p in excluded})
-            self.assertEqual([], SYNC_MODULE.plan_deletions(source, target))
+    def test_codex_only_skills_excluded_from_sync_and_cleanup(self):
+        for identity in ["automation-management", "config-codex-sync"]:
+            with self.subTest(identity=identity), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source, target = root / "source", root / "target"
+                for base in [source, target]:
+                    base.mkdir()
+                    for name in [identity, "portable", "alias"]:
+                        folder = base / name
+                        folder.mkdir()
+                        skill_name = identity if name == "alias" else name
+                        (folder / "SKILL.md").write_text(f"---\nname: '{skill_name}'\ndescription: Codex workflow\n---\n")
+                    (base / f"{identity}.md").write_text(f"---\nname: {identity}\ndescription: test\n---\n")
+                (target / identity / "old.txt").write_text("keep")
+                included, excluded = SYNC_MODULE.discover_skills(source)
+                self.assertEqual(["portable"], [p.name for p in included])
+                self.assertEqual({identity, f"{identity}.md", "alias"}, {p.name for p in excluded})
+                self.assertEqual([], SYNC_MODULE.plan_deletions(source, target))
 
     def test_excludes_all_mcp_skill_types(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -128,11 +129,14 @@ class DeleteSyncTest(unittest.TestCase):
                 result = subprocess.run(command + list(args), capture_output=True, text=True)
                 self.assertEqual(0, result.returncode, result.stderr)
                 return result.stdout
+            (keep / 'obsolete.txt').write_text('old')
+            run()
+            (keep / 'obsolete.txt').unlink()
             preview = run('--delete', '--dry-run')
             self.assertNotIn(str(old / 'SKILL.md'), preview)
             self.assertIn(str(target_keep / 'obsolete.txt'), preview)
             self.assertTrue(old.exists())
-            self.assertFalse((target / 'CLAUDE.md').exists())
+            self.assertTrue((target / 'CLAUDE.md').exists())
             run()
             self.assertTrue(old.exists())
             run('--delete')
@@ -192,6 +196,144 @@ class DeleteSyncTest(unittest.TestCase):
             (target / 'skills').symlink_to(source / 'skills', target_is_directory=True)
             with self.assertRaises(SYNC_MODULE.SyncError):
                 SYNC_MODULE.validate_paths(source, [('Claude', target)])
+
+
+class ManagedRetirementTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source, self.target = self.root / 'source', self.root / 'target'
+        (self.source / 'skills').mkdir(parents=True)
+        (self.source / 'AGENTS.md').write_text('rules')
+        self.skill(self.source, 'keep')
+
+    def skill(self, root, name):
+        path = root / 'skills' / name
+        path.mkdir(parents=True, exist_ok=True)
+        (path / 'SKILL.md').write_text(f'---\nname: {name}\ndescription: test\n---\n')
+        return path
+
+    def run_sync(self, *args, code=0, source=None):
+        import subprocess
+        result = subprocess.run([sys.executable, str(SCRIPT_PATH), '--target', 'claude', '--codex-root', str(source or self.source), '--claude-root', str(self.target), *args], capture_output=True, text=True)
+        self.assertEqual(code, result.returncode, result.stdout + result.stderr)
+        return result.stdout
+
+    def state(self):
+        import json
+        return json.loads((self.target / SYNC_MODULE.STATE_FILE).read_text())
+
+    def test_lifecycle_preview_incremental_retirement_and_idempotence(self):
+        import shutil
+        old = self.skill(self.source, 'old')
+        independent = self.skill(self.target, 'independent')
+        self.run_sync('--dry-run')
+        self.assertFalse((self.target / SYNC_MODULE.STATE_FILE).exists())
+        self.run_sync()
+        self.assertIn('old', self.state()['managed'])
+        self.assertNotIn('independent', self.state()['managed'])
+        shutil.rmtree(old)
+        self.run_sync()  # Missing-source ownership must survive incremental runs.
+        self.assertIn('old', self.state()['managed'])
+        self.run_sync('--delete', '--dry-run')
+        self.assertTrue((self.target / 'skills/old').exists())
+        self.run_sync('--delete')
+        self.assertFalse((self.target / 'skills/old').exists())
+        self.assertTrue(independent.exists())
+        self.assertNotIn('old', self.state()['managed'])
+        self.run_sync('--delete')
+
+    def test_modified_and_added_files_block_whole_skill_retirement(self):
+        import shutil
+        old = self.skill(self.source, 'old')
+        self.run_sync()
+        baseline = self.state()['managed']['old']
+        shutil.rmtree(old)
+        target = self.target / 'skills/old'
+        (target / 'SKILL.md').write_text('customized')
+        self.run_sync('--delete', code=2)
+        self.assertEqual(baseline, self.state()['managed']['old'])
+        self.assertEqual('customized', (target / 'SKILL.md').read_text())
+        (target / 'SKILL.md').write_text('---\nname: old\ndescription: test\n---\n')
+        (target / 'extra').write_text('user data')
+        self.run_sync('--delete', code=2)
+        self.assertTrue((target / 'extra').exists())
+
+    def test_modified_removed_file_keeps_baseline_for_retry(self):
+        src = self.source / 'skills/keep/file'
+        src.write_text('baseline')
+        self.run_sync()
+        src.unlink()
+        dst = self.target / 'skills/keep/file'
+        dst.write_text('user edit')
+        self.run_sync('--delete', code=2)
+        self.assertEqual('user edit', dst.read_text())
+        dst.write_text('baseline')
+        self.run_sync('--delete')
+        self.assertFalse(dst.exists())
+
+    def test_partial_adapter_does_not_retire_unselected_skill(self):
+        import shutil
+        self.skill(self.source, 'other')
+        self.run_sync()
+        adapter = self.root / 'adapter'
+        (adapter / 'skills').mkdir(parents=True)
+        shutil.copytree(self.source / 'skills/keep', adapter / 'skills/keep')
+        shutil.copy2(self.source / 'AGENTS.md', adapter / 'AGENTS.md')
+        self.run_sync('--origin-root', str(self.source), '--delete', source=adapter, code=1)
+        self.run_sync('--origin-root', str(self.source), '--partial', '--delete', source=adapter)
+        self.assertTrue((self.target / 'skills/other').exists())
+        self.assertIn('other', self.state()['managed'])
+
+    def test_state_identity_corruption_and_path_traversal_fail_closed(self):
+        import json
+        self.run_sync()
+        path = self.target / SYNC_MODULE.STATE_FILE
+        original = self.state()
+        path.write_text('{bad json')
+        self.run_sync('--delete', code=1)
+        original['managed']['../outside'] = {'.': 'dir'}
+        path.write_text(json.dumps(original))
+        self.run_sync('--delete', code=1)
+        del original['managed']['../outside']
+        original['origin'] = '/different-source'
+        path.write_text(json.dumps(original))
+        self.run_sync('--delete', code=1)
+
+    def test_explicit_retirement_requires_matching_snapshot(self):
+        dest = self.skill(self.target, 'retired')
+        snapshot = SYNC_MODULE.tree_snapshot(dest)
+        registry = {'retired': {'baselines': [{'snapshot': snapshot}]}}
+        state = {'managed': {}}
+        plan, conflicts, retired, _ = SYNC_MODULE.managed_deletions(self.source / 'skills', self.target / 'skills', state, registry, False)
+        self.assertFalse(conflicts)
+        self.assertIn(dest, plan)
+        self.assertEqual({'retired'}, retired)
+        (dest / 'extra').write_text('keep')
+        plan, conflicts, _, _ = SYNC_MODULE.managed_deletions(self.source / 'skills', self.target / 'skills', state, registry, False)
+        self.assertFalse(plan)
+        self.assertTrue(conflicts)
+
+    def test_filtered_origin_entry_is_not_mistaken_for_retirement(self):
+        origin = self.root / 'origin'
+        self.skill(origin, 'previously-portable')
+        dest = self.skill(self.target, 'previously-portable')
+        state = {'managed': {'previously-portable': SYNC_MODULE.tree_snapshot(dest)}}
+        # The adapted source omits the now-excluded entry; the canonical source still has it.
+        plan, conflicts, retired, _ = SYNC_MODULE.managed_deletions(self.source / 'skills', self.target / 'skills', state, {}, False, origin / 'skills')
+        self.assertFalse(plan)
+        self.assertFalse(conflicts)
+        self.assertFalse(retired)
+
+    def test_excluded_skill_is_never_retired(self):
+        for name in ['setup-mcp', 'automation-management', 'config-codex-sync']:
+            dest = self.skill(self.target, name)
+            state = {'managed': {name: SYNC_MODULE.tree_snapshot(dest)}}
+            plan, conflicts, retired, _ = SYNC_MODULE.managed_deletions(self.source / 'skills', self.target / 'skills', state, {}, False)
+            self.assertFalse(plan)
+            self.assertFalse(conflicts)
+            self.assertNotIn(name, retired)
 
 if __name__ == "__main__":
     unittest.main()
