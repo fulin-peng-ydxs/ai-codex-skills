@@ -15,7 +15,7 @@ CAPABILITIES = {
 DOMAINS = {
     "ai", "automation", "backend", "business", "code", "config", "design",
     "development", "frontend", "git", "investment", "project", "requirement",
-    "skill", "system",
+    "skill", "system", "operation",
 }
 EXCEPTIONS = {"git-push"}
 WEAK_WORDS = {"auto", "smart", "advanced", "msg", "dev"}

@@ -42,6 +42,7 @@
 | `frontend` | 界面呈现、页面原型、体验与前端实现复用 | `frontend-design`、`frontend-prototype-design`、`frontend-ux-audit` |
 | `git` | Git 提交消息与提交推送流程 | `git-commit-message-authoring`、`git-push` |
 | `investment` | 投资研究知识与跟踪维护 | `investment-ai-trend-knowledge-maintenance` |
+| `operation` | 服务器运维、连接与变更授权、单位手册和操作留痕 | `operation-workflow` |
 | `project` | 项目总体认知、README 与模块架构事实文档 | `project-handover-analysis`、`project-readme-authoring`、`project-module-architecture-doc-authoring` |
 | `requirement` | 需求闭环与正式需求契约 | `requirement-closure-design`、`requirement-doc-authoring` |
 | `skill` | 技能本身的编写与维护规范 | `skill-authoring-standard` |

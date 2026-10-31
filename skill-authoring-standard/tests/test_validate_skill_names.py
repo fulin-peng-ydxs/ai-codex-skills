@@ -41,10 +41,10 @@ class NamingTests(unittest.TestCase):
         self.assertTrue(any("目录名" in error for error in errors))
 
     def test_registered_domain_is_required_before_subdomain(self):
-        for name in ["design-spec-authoring", "frontend-prototype-design", "frontend-ux-audit", "config-codex-sync", "system-disk-usage-analysis"]:
+        for name in ["design-spec-authoring", "frontend-prototype-design", "frontend-ux-audit", "config-codex-sync", "system-disk-usage-analysis", "operation-workflow"]:
             with self.subTest(name=name):
                 self.assertEqual([], MODULE.validate_skill(self.skill(name)))
-        for name in ["page-ux-audit", "disk-usage-analysis", "codex-config-sync", "module-architecture-doc-authoring"]:
+        for name in ["page-ux-audit", "disk-usage-analysis", "codex-config-sync", "module-architecture-doc-authoring", "operations-workflow", "server-operation-workflow"]:
             with self.subTest(name=name):
                 errors = MODULE.validate_skill(self.skill(name))
                 self.assertTrue(any("一级领域" in error for error in errors))
