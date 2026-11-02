@@ -48,7 +48,7 @@ description: 在用户要求生成或更新开发计划、拆解任务，或开�
 
 ### 默认文档模板与最低内容
 
-完整目录及适配条件由 [产物模板](references/output-template.md#开发计划主体) 维护；本文维护模式、最低信息、任务与状态语义。
+完整目录及适配条件由 [产物模板](references/output-template.md) 维护；本文维护模式、最低信息、任务与状态语义。
 
 生成对应完整产物或获准补全本部分时，读取 [开发计划主体](references/output-template.md#开发计划主体)；仅保存或局部更新不重新套版。
 
