@@ -112,34 +112,14 @@
 
 ## 使用方式
 
-1. 在会话中直接描述需求，命中技能适用场景时，Codex 会按技能说明执行。
-2. 如果想明确触发某个技能，可以在需求中直接点名技能名称或表达对应任务目标。
-3. 使用前优先检查对应目录下的 `SKILL.md`，必要时补充 `references/`、模板或脚本资源。
-4. 新增技能时，至少创建 `技能目录/SKILL.md`，写清名称、用途、触发条件、执行步骤和边界约束。
-5. 技能调用策略须在 `SKILL.md`、`agents/openai.yaml` 和 README 中保持一致；仅显式调用的技能注明点名条件，自动调用的技能写清适用意图与边界。`development-workflow` 支持自动调用。
-6. 需求协作按阶段选择技能：闭环补齐业务链路，需求文档固化可验收契约，原型表达页面与模拟交互，开发计划承接实现与验证；完成当前阶段不自动启动下一阶段。
-7. 四个技能共用 [需求协作契约](requirement-doc-authoring/references/workflow-contract.md)，维护事实继承、确认、草案保存、已有文件复用及阶段条目粒度；通用结构选择引用 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md#模板与结构选择)。闭环、需求和计划使用默认骨架，不得把适用功能点、任务或验证记录压成概述。
-8. HTML/结构图原型的选择、制作与验证规则由 [frontend-prototype-design](frontend-prototype-design/SKILL.md) 维护；需求技能负责页面范围与引用，计划按普通/专业模式处理前置、读取实际产物或明确的替代依据，不重做已确认原型。
-9. 需求编号与验收契约由 [requirement-doc-authoring](requirement-doc-authoring/SKILL.md) 维护；任务状态与需求汇总由 [development-workflow](development-workflow/SKILL.md) 维护，不用计划覆盖程度代替实际完成。
-10. 页面复用、组件/布局配置接入按计划技能和项目真实机制确定；自动接入不重复登记，无平台不为模板新增体系，基础能力需真实样板与消费验证。
-11. 性能、安全与兼容内容按风险展开：需求维护目标及边界，计划维护实现、验证和发布安排；实际证据在已有实施记录维护。
-12. 前端任务按上方“前端设计与体验治理”表选择技能；各维度保留独立判据，同根因问题合并报告，已有有效证据共享使用。
-13. `business-feature-audit` 只负责业务闭环、状态流转、上下游协同和前端业务承接，不替代页面 UX、DESIGN 合规或前端复用治理；涉及这些问题时应转交对应前端审查技能。
-14. 需要面向开发者追踪一个业务目标从入口、鉴权、筛数、写表、状态推进到终态时，使用 `business-closed-loop-analysis`，可跨模块和多对象状态机；目标需求设计交给 `requirement-closure-design`，当前改动核查交给 `business-feature-audit`，共享技术机制归技术专题。
-15. `frontend-design` 同时支持整体设计与局部呈现修改；遵循当前产品和设计系统，不因调用技能自动扩大范围或启动全站专项审核。
-16. 涉及 Codex 自动化的创建、精简或排障时，优先使用 `automation-management`；如果自动化依赖其他技能或项目文档，提示词应只补充固定目标、差异化约束和外部副作用边界，不要重复整段技能或项目规则。
-17. 涉及 Git 提交文案生成时，使用 `git-commit-message-authoring`；它只输出提交消息，不执行 `git add`、`git commit` 或 `git push`。只有用户使用 `$git-commit-message-authoring` 或明确要求调用该技能时才交互确认文件范围；被其它提交流程自动调用或普通生成请求时，由 AI 自行核定可靠范围并直接输出文案。
-18. 需要实际执行 Git 提交与推送时，使用 `git-push`，并由其内部调用 `git-commit-message-authoring` 生成提交文案，复用已确定的范围；只有用户使用 `$git-push` 或明确要求调用该技能时才执行文件范围、提交文案、staged 清单和 push 的交互确认；普通“提交”“推送”请求由 AI 按可靠范围连续执行，但不得扩大用户对 push 的授权。
-19. 需要把 Codex 的全局 skills 或协作说明对齐到 Claude Code、Kimi Code 时，使用 `config-codex-sync`；它必须调用随技能提供的 `scripts/sync_codex_config.py`，默认先执行 `--dry-run` 预览，再按用户授权使用相同的目标、同步源和范围正式同步。需要路径适配或局部同步时先准备隔离临时源，目标专用路径不反写 Codex；Claude、Kimi 适配结果不同时分别准备并执行。Claude 目标文档写入 `CLAUDE.md`，Kimi 目标文档写入 `AGENTS.md`，保留目标端独有内容，并排除所有 MCP 相关技能；源端删除不会自动清除目标副本。
-20. 需要评估整个项目或交付包的完整性、风险和接手顺序时，使用 `project-handover-analysis`，报告保留版本与检查时点；需要持续维护系统/部署架构、功能模块或特定技术机制时，使用 `project-module-architecture-doc-authoring`。业务闭环正文维护逐环节状态、权限、字段与消费口径，README 保留最小使用路径和导航；详细事实不重复维护。
-21. 使用 `project-module-architecture-doc-authoring` 时，先读取 `references/output-contract.md`，按输出契约生成并逐篇运行 `scripts/validate_architecture_doc_structure.py`；默认使用 `--custom-structure`；仅明确采用脚本内置骨架时省略该参数，外部固定契约另行核对，结构校验不能替代事实和内容完整性复核。
-22. 排查磁盘空间或电脑卡顿时，分别使用 `system-disk-usage-analysis` 或 `system-process-usage-analysis`，默认只读采样并说明测量限制；实际清理前必须读取 [清理安全规则](system-disk-usage-analysis/references/cleanup-safety.md)，处理进程前重新核对目标身份与影响，并按技能要求取得明确授权。
+1. 直接描述目标，按上方技能清单选择适用入口；需要指定技能时使用 `$技能名称`。实际触发条件及显式调用要求由对应技能维护。
+2. 执行前读取目标目录的 `SKILL.md`，按当前分支加载必要资源；不把 README 的能力摘要作为完整执行契约。
+3. 需求协作按当前阶段选闭环、正式需求、原型或开发计划，阶段衔接见 [共用契约](requirement-doc-authoring/references/workflow-contract.md)。已有成果按其角色继承，不因进入一个阶段自动补齐全链路。
+4. 页面任务按“前端设计与体验治理”中的选择表组合所需技能；业务闭环核查、技术解释和项目接手评估分别从对应技能进入。
 
 ## 文档输出规则入口
 
-全部技能按实际产物判断是否适用 [文档结构与输出规范](~/ai-agent-config/config/force/document-output.md)，不以“（适用时）”有无判断模板是否固定。各技能或其引用契约维护具体要求，本表只做入口分类；不因适配而新增文档或改变触发方式。阅读组织规则在输出契约、模板或内联结构接入，已有共用契约的复用原入口，具体维护方式见 [技能编写规范](skill-authoring-standard/SKILL.md#核心约束)。
-
-文档边界的共用写法由 [共用声明骨架](~/ai-agent-config/config/force/document-boundaries.md#共用声明骨架) 维护；技能中的接入位置与读取条件由 [通用文档规范的引用位置](skill-authoring-standard/SKILL.md#通用文档规范的引用位置) 维护。各产物模板、输出契约或内联结构承接具体职责，技能文件自身的边界说明不能代替产物说明。
+通用结构与裁剪见 [文档输出规范](~/ai-agent-config/config/force/document-output.md)，权威归属与边界说明见 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。下表只用于选入口，各类产物的具体要求由所指资源维护；技能设计如何接入这些规范见 [技能编写规范](skill-authoring-standard/SKILL.md#生成文档技能的设计要求)。
 
 | 结构或处理方式 | 技能范围 | 具体契约位置 |
 | --- | --- | --- |
@@ -154,29 +134,13 @@
 
 `.system/` 下的系统技能按各自入口维护契约：[skill-creator](.system/skill-creator/SKILL.md) 创建和更新技能，[review-agent](.system/review-agent/SKILL.md) 执行受委派的只读代码审查，[openai-docs](.system/openai-docs/SKILL.md) 提供 OpenAI 产品、API 与 Codex 文档指引，[imagegen](.system/imagegen/SKILL.md) 生成或编辑图像，[skill-installer](.system/skill-installer/SKILL.md) 安装技能。本 README 不另行定义这些技能的产物结构。
 
-## 编写建议
+## 编写与维护入口
 
-- 创建或重命名自有技能时，先读取 [技能命名规范](skill-authoring-standard/references/skill-naming.md)；英文标识、中文标题和 UI 名称分别按其契约维护。运行 `python3 skill-authoring-standard/scripts/validate_skill_names.py .` 检查本仓库名称，系统和插件技能沿用提供方名称。
-- 描述要聚焦“什么时候用、具体怎么做、哪些不能做”。
-- 明确输出位置、交付要求、确认条件和安全边界；固定项须有稳定对外接口、机器契约、有效项目/用户要求或技能明确稳定输出契约作为依据。
-- 正文、独立模板与共用资源的取舍遵循 [技能编写规范](skill-authoring-standard/SKILL.md#正文与独立资源的选择)，同时核对相邻技能及产物的内容归属；不按字数或文件数机械拆合。
-- 文档模板按 [模板与结构选择](~/ai-agent-config/config/force/document-output.md#模板与结构选择) 声明参考结构、默认骨架或固定结构，并分别定义核心内容、条件触发及必要固定项；“适用时”只是提示，不是自适应开关。各技能只维护自身内容契约，不复制通用裁剪规则。
-- 技能面向复用，优先沉淀稳定流程，不把一次性上下文写进全局技能。
-- 通用文档目录规则引用 `~/ai-agent-config/config/force/collaboration-rule.md`；技能仅维护产物文件名、必要子目录和专属路径例外，相关提示词、模板及脚本保持一致。
-- 技能触发方式、关键资源、维护约束发生变化时，优先更新对应 `SKILL.md`，并同步检查本 README 的“当前技能”和使用说明是否仍准确。
-- 新增、删除或重命名顶层技能目录时，优先同步“当前技能”列表；若新增技能改变了适用场景边界，也要补齐 README 中的用途说明和使用指引。
-- 若 Git 提交流程类技能新增了稳定的确认节点、交互式提问工具依赖、staged 校验或 push 安全约束，也要同步检查 README 是否已准确反映职责分工。
-- 若 Git 提交流程类技能调整显式调用、流程内自动调用或普通请求的交互边界，也要同步检查 README 是否准确区分各调用模式，且不改变用户对提交与推送的授权范围。
-- 若业务闭环分析类技能调整稳定章节、数据权限运行链路、表关系、字段赋值或与需求闭环、业务核查、模块架构的职责边界，也要同步检查入口文件、关键参考资料和 README 的描述是否一致。
-- 若新增跨工具同步类技能，README 需写清源目录、目标目录、是否先预览、是否覆盖文档、是否保留目标端独有文件，以及是否排除某类技能，避免把一次性复制流程误写成删除式镜像。
-- 若 MCP 同步类技能新增或调整启动参数同步规则、命令匹配优先级、配置块更新策略或报告脱敏要求，也要同步检查 README 是否已准确反映这些维护约束。
-- 对以需求文档为输入的技能，若调整上游结论继承、模板、原型或验证方式，必须依据实际存在的资源同步检查入口与 README，明确职责和先后关系。
-- 若需求闭环、需求文档或开发计划技能新增了稳定状态枚举、范围映射、原型约束、前端组件与配置接入闭环或是否纳入的约束，也要同步检查 README 是否已写清这些维护规则。
-- 若 AI 约束文档、项目 README 或模块架构文档类技能新增了稳定的输出契约、结构校验、命令验证门禁、输出目录规则、薄入口职责分离或文档索引约束，必须同步核对技能入口、参考资料与校验脚本的一致性，并检查 README 是否已准确反映这些规则。
-- 若项目接手分析类技能调整默认章节骨架、证据与完整性门禁、扫描分类或报告模板，必须同步核对入口文件、参考资料、模板、扫描脚本和测试的一致性，并检查 README 的用途与相邻技能边界。
-- 文档生成与需求设计技能的内容清单、读者路径和验收细则由技能正文或其引用资源维护；本 README 仅同步用途、触发条件、职责边界和入口，不复制执行细则。
+创建、重构或重命名自有技能使用 [技能编写规范](skill-authoring-standard/SKILL.md)；精简与职责审查使用 [AI 指令精简与重构](ai-instruction-refactoring/SKILL.md)。具体设计、命名及验证要求只在对应入口维护。
+
+- 修改能力、触发条件、职责或资源入口时，先维护所属技能及权威资源，再同步受影响的消费者；本 README 仅更新用途、选用方式和入口摘要。
+- 新增、删除或重命名顶层技能时同步“当前技能”清单；不将状态枚举、完整目录、流程门禁、命令清单或产物字段另抄到 README。
 
 ## 备注
 
 - “当前技能”列表介绍 `~/.codex/skills/` 下的用户自定义技能；`.system/` 仅在输出规则入口说明相关契约，不列为用户自定义技能。
-- 技能能力或边界调整后，以对应目录的 `SKILL.md` 及其引用资源维护事实，并同步本 README 中受影响的清单和说明。
