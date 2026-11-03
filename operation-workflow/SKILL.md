@@ -7,7 +7,7 @@ description: 初始化运维工作空间、接入服务器、盘点服务，按�
 
 ## 职责与边界
 
-本技能维护执行顺序和授权节点。[工作空间](references/workspace.md) 定义初始化、清单和手册；[命令策略](references/command-policy.md) 定义通配规则与判定工具；[留痕](references/records.md) 定义方案、汇报、镜像和归档。环境事实保存在目标项目；通用底线读取 `~/ai-agent-config/config/force/collaboration-rule.md`。
+本技能维护执行顺序和授权节点。[工作空间](references/workspace.md) 定义初始化、清单和手册；[命令策略](references/command-policy.md) 定义通配规则与判定工具；[留痕](references/records.md) 定义方案、汇报、镜像和归档。环境事实保存在目标项目。
 
 ## 输入与前置条件
 
