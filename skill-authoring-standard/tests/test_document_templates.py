@@ -272,73 +272,51 @@ class FixedDocumentTests(unittest.TestCase):
             self.assertEqual(0, kept.returncode, kept.stderr)
             self.assertIn('fixed-template conformance not checked', kept.stdout)
 
-    def test_english_artifacts_use_the_same_structure_and_fixed_labels(self):
-        for skill, script in [('project-readme-authoring', 'validate_readme_structure'),
-                              ('project-module-architecture-doc-authoring', 'validate_architecture_doc_structure')]:
-            with self.subTest(skill=skill), tempfile.TemporaryDirectory() as directory:
-                source = (ROOT / skill / 'references/output-contract.md').read_text()
-                english = check.localized_template(source, 'en')
-                skeleton = check.template_blocks(english)['document']
-                good = filled(skeleton)
-                self.assertEqual([], check.validate_artifact(good, source, 'en'))
-                self.assertEqual([], check.validate_artifact(good, source, 'auto'))
-                self.assertTrue(check.validate_artifact(good, source, 'zh'))
-                self.assertTrue(check.validate_artifact(good, source, 'unsupported'))
-                # Values remain placeholders; localization cannot add/remove structure.
-                canonical = check.template_blocks(source)['document']
-                self.assertEqual(check.PLACEHOLDER.findall(canonical), check.PLACEHOLDER.findall(skeleton))
-                self.assertEqual(len(check.parse_tree(canonical).children[0].children),
-                                 len(check.parse_tree(skeleton).children[0].children))
-                path = Path(directory) / 'document.md'
-                path.write_text(good)
-                cmd = [sys.executable, str(ROOT / skill / 'scripts' / (script + '.py')), str(path)]
-                for args in [[], ['--language', 'en']]:
-                    result = subprocess.run(cmd + args, capture_output=True, text=True)
-                    self.assertEqual(0, result.returncode, result.stderr)
-                shared = subprocess.run([sys.executable, str(ROOT / 'skill-authoring-standard/scripts/validate_document_template.py'),
-                                         str(path), '--template', str(ROOT / skill / 'references/output-contract.md'),
-                                         '--language', 'en'], capture_output=True, text=True)
-                self.assertEqual(0, shared.returncode, shared.stderr)
-                spec = importlib.util.spec_from_file_location(script, ROOT / skill / 'scripts' / (script + '.py'))
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                self.assertEqual([], module.validate(good, language='en'))
-                self.assertTrue(module.validate(good, language='zh'))
-                first_field = next(line for line in good.splitlines() if line.startswith('- ') and ': ' in line)
-                missing = good.replace(first_field + '\n', '', 1)
-                self.assertTrue(check.validate_artifact(missing, source, 'en'))
-                self.assertTrue(check.validate_artifact(good.replace(first_field, '- Invented field: extra\n' + first_field, 1), source, 'en'))
-                if skill == 'project-module-architecture-doc-authoring':
-                    no_rows = good.rsplit('\n| ', 1)[0] + '\n\nEntries: None: No verification records in this isolated syntax fixture.\n'
-                    self.assertEqual([], check.validate_artifact(no_rows, source, 'en'))
-                path.write_text(good + '\n## Invented section\nExtra.\n')
-                self.assertNotEqual(0, subprocess.run(cmd + ['--language', 'en'], capture_output=True).returncode)
-
-    def test_translation_mapping_cannot_silently_drift(self):
-        source = (ROOT / 'project-readme-authoring/references/output-contract.md').read_text()
-        self.assertEqual([], check.check_template(source))
-        for bad in [source.replace('"常用任务": "Common tasks",', ''),
-                    source.replace('"常用任务": "Common tasks",', '"常用任务": "Common tasks", "闲置": "Unused",'),
-                    source.replace('"常用任务": "Common tasks",', '"常用任务": "Common tasks", "常用任务": "Duplicate",'),
-                    source.replace('"定位与读者：": "Purpose and readers: "', '"定位与读者：": "Missing colon"'),
-                    source.replace('"常用任务": "Common tasks"', '"常用任务": "Common tasks\\n## Injected"'),
-                    source.replace('"常用任务": "Common tasks"', '"常用任务": "{{@unfinished"')]:
-            with self.subTest(bad=bad[-100:]):
-                self.assertTrue(check.check_template(bad))
-
     def test_ascii_colon_fields_do_not_take_over_skill_yaml(self):
         source = (ROOT / 'skill-authoring-standard/references/skill-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
         good = good.replace('description: 样例1', 'description: 样例1\nlicense: MIT')
         self.assertEqual([], check.validate(good, source))
-        english = CONTRACT.replace('范围：', 'Scope:').replace('结论：', 'Conclusion:')
-        report = GOOD.replace('范围：', 'Scope:').replace('结论：', 'Conclusion:')
-        self.assertEqual([], check.validate(report, english))
-        self.assertTrue(check.validate(report.replace('- Conclusion:', '- Invented: extra\n- Conclusion:'), english))
+        ascii_contract = CONTRACT.replace('范围：', '范围:').replace('结论：', '结论:')
+        report = GOOD.replace('范围：', '范围:').replace('结论：', '结论:')
+        self.assertEqual([], check.validate(report, ascii_contract))
+        self.assertTrue(check.validate(report.replace('- 结论:', '- 临时字段: 额外内容\n- 结论:'), ascii_contract))
         numbered = CONTRACT.replace('Q{{@序号}}：{{@名称}}', 'Q{{@序号}}: {{@名称}}')
         duplicate = GOOD.replace('Q1：无权限导出', 'Q1: Export').replace('## 验证覆盖',
             '### Q1: Another title\n- 证据：来源。\n- 影响：影响。\n- 验证：未验证。\n\n## 验证覆盖')
         self.assertTrue(check.validate(duplicate, numbered))
+
+    def test_entrypoints_use_explicit_project_contract_without_language_modes(self):
+        source = '```document-template\n# {{@项目名称}}\n\n## 项目约定\n- 用途与归属：{{@实际职责及范围}}\n- 操作入口：{{@真实入口或当前缺口}}\n```'
+        good = '# 隔离样例\n\n## 项目约定\n- 用途与归属：仅检查该隔离样例的文档格式，不记录真实项目事实。\n- 操作入口：未接入实际项目；需取得真实入口后补充。\n'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            contract = root / 'output-contract.md'
+            document = root / 'document.md'
+            contract.write_text(source)
+            document.write_text(good)
+            for skill, script in [('project-readme-authoring', 'validate_readme_structure'),
+                                  ('project-module-architecture-doc-authoring', 'validate_architecture_doc_structure')]:
+                with self.subTest(skill=skill):
+                    entry = ROOT / skill / 'scripts' / (script + '.py')
+                    cmd = [sys.executable, str(entry), str(document)]
+                    self.assertNotEqual(0, subprocess.run(cmd, capture_output=True).returncode)
+                    result = subprocess.run(cmd + ['--template', str(contract)], capture_output=True, text=True)
+                    self.assertEqual(0, result.returncode, result.stderr)
+                    help_text = subprocess.run([sys.executable, str(entry), '--help'], capture_output=True, text=True)
+                    self.assertNotIn('--language', help_text.stdout)
+                    spec = importlib.util.spec_from_file_location(script, entry)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    self.assertEqual([], module.validate(good, custom_structure=True))
+                    with self.assertRaises(TypeError):
+                        module.validate(good, '旧位置参数')
+            shared = ROOT / 'skill-authoring-standard/scripts/validate_document_template.py'
+            result = subprocess.run([sys.executable, str(shared), str(document), '--template', str(contract)], capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stderr)
+            document.write_text(good.replace('- 用途与归属：仅检查该隔离样例的文档格式，不记录真实项目事实。\n', ''))
+            result = subprocess.run([sys.executable, str(shared), str(document), '--template', str(contract)], capture_output=True)
+            self.assertNotEqual(0, result.returncode)
 
 
 if __name__ == '__main__':

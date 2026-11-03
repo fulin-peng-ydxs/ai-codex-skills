@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
-import json
 from pathlib import Path
 import re
 import sys
@@ -20,8 +19,7 @@ HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
 REPEAT = re.compile(r'\s*<!-- repeat(?P<required>-required)? -->\s*$')
 FIELD = re.compile(r'^(?:- )?([^\n：:]+[：:])(.*)$')
 UNFINISHED = re.compile(r'\{\{@|\b(?:TODO|TBD)\s*:', re.I)
-ABSENT = re.compile(r'^(?:- )?(?:(?:条目情况|适用性)：(?:无|不适用)[：:，； ]+|'
-                    r'(?:Entries|Applicability):\s*(?:None|Not applicable):\s*)\S[^\n]*$', re.M | re.I)
+ABSENT = re.compile(r'^(?:- )?(?:条目情况|适用性)：(?:无|不适用)[：:，； ]+\S[^\n]*$', re.M)
 
 
 @dataclass
@@ -34,13 +32,13 @@ class Node:
     children: list['Node'] = field(default_factory=list)
 
 
-def marked_blocks(text: str, marker: str) -> dict[str, str]:
+def template_blocks(text: str) -> dict[str, str]:
     """Read explicitly marked fenced blocks without treating examples as contracts."""
     result: dict[str, str] = {}
     lines = text.splitlines()
     index = 0
     while index < len(lines):
-        match = re.fullmatch(r'(`{3,}|~{3,})' + re.escape(marker) + r'(?: ([a-z][a-z0-9-]*))?\s*', lines[index])
+        match = re.fullmatch(r'(`{3,}|~{3,})document-template(?: ([a-z][a-z0-9-]*))?\s*', lines[index])
         if not match:
             index += 1
             continue
@@ -50,88 +48,14 @@ def marked_blocks(text: str, marker: str) -> dict[str, str]:
         while index < len(lines) and not re.fullmatch(re.escape(fence[0]) + '{' + str(len(fence)) + r',}\s*', lines[index]):
             index += 1
         if index == len(lines):
-            raise ValueError(f'unclosed {marker} block: {name}')
+            raise ValueError(f'unclosed document-template block: {name}')
         if name in result:
-            raise ValueError(f'duplicate {marker} block: {name}')
+            raise ValueError(f'duplicate document-template block: {name}')
         result[name] = '\n'.join(lines[start:index])
         index += 1
     if not result:
-        raise ValueError(f'missing {marker} block')
+        raise ValueError('missing document-template block')
     return result
-
-
-def template_blocks(text: str) -> dict[str, str]:
-    return marked_blocks(text, 'document-template')
-
-
-def label_maps(text: str) -> dict[str, dict[str, str]]:
-    if not re.search(r'^(?:`{3,}|~{3,})template-labels(?: |$)', text, re.M):
-        return {}
-    result = {}
-    def unique(pairs):
-        values = {}
-        for key, value in pairs:
-            if key in values:
-                raise ValueError(f'duplicate translated label: {key}')
-            values[key] = value
-        return values
-    for language, raw in marked_blocks(text, 'template-labels').items():
-        labels = json.loads(raw, object_pairs_hook=unique)
-        if not isinstance(labels, dict) or not labels or any(
-                not isinstance(value, str) or not value.strip() or '\n' in value or '\r' in value
-                or '|' in value or '{{@' in value for value in labels.values()):
-            raise ValueError(f'{language}: translated labels must be a nonempty string mapping')
-        result[language] = labels
-    return result
-
-
-def localize_skeleton(skeleton: str, labels: dict[str, str]) -> str:
-    """Translate display labels only; hierarchy, fields and repetition stay canonical."""
-    used = set()
-    def translate(fragment):
-        parts = re.split(f'({PLACEHOLDER.pattern})', fragment)
-        output = []
-        for part in parts:
-            if not part.strip() or PLACEHOLDER.fullmatch(part):
-                output.append(part)
-            else:
-                if part not in labels:
-                    raise ValueError(f'missing translated label: {part}')
-                used.add(part)
-                output.append(labels[part])
-        return ''.join(output)
-    pairs = list(fenced_lines(skeleton))
-    headers = {index for index, _ in table_headers([line for line, _ in pairs])
-               if pairs[index][1] == 'prose'}
-    output = []
-    for index, (line, kind) in enumerate(pairs):
-        heading = HEADING.match(line) if kind == 'prose' else None
-        field_match = FIELD.match(line) if kind == 'prose' and not line[:1].isspace() else None
-        if heading:
-            marker = REPEAT.search(heading[2])
-            title = heading[2][:marker.start()] if marker else heading[2]
-            line = heading[1] + ' ' + translate(title) + (marker[0] if marker else '')
-        elif index in headers:
-            line = '| ' + ' | '.join(translate(cell) for cell in table_cells(line)) + ' |'
-        elif field_match and PLACEHOLDER.search(field_match[2]):
-            label = translate(field_match[1])
-            if not re.fullmatch(r'[^：:]+[：:]\s*', label):
-                raise ValueError(f'translated field must retain a final colon: {field_match[1]}')
-            line = ('- ' if line.startswith('- ') else '') + label + field_match[2]
-        output.append(line)
-    unused = labels.keys() - used
-    if unused:
-        raise ValueError(f'unused translated labels: {sorted(unused)}')
-    return '\n'.join(output)
-
-
-def localized_template(text: str, language: str) -> str:
-    labels = label_maps(text).get(language)
-    if labels is None:
-        return text  # An explicitly supplied project template may already be translated.
-    return '\n'.join('````document-template' + ('' if name == 'document' else ' ' + name)
-                     + '\n' + localize_skeleton(skeleton, labels) + '\n````'
-                     for name, skeleton in template_blocks(text).items())
 
 
 def parse_tree(text: str, template: bool = False) -> Node:
@@ -270,28 +194,7 @@ def check_template(text: str) -> list[str]:
                     errors.append(f'{name}: heading has no fillable body: {child.title}')
                 walk(child)
         walk(root)
-    try:
-        for language in label_maps(text):
-            localized_template(text, language)
-    except ValueError as exc:
-        errors.append(str(exc))
     return errors
-
-
-def validate_artifact(text: str, template_text: str, language: str = 'auto') -> list[str]:
-    """Keep README/architecture language selection in their authoritative resources."""
-    if language not in {'auto', 'zh', 'en'}:
-        return [f'unsupported language: {language}']
-    try:
-        if language == 'en':
-            return validate(text, localized_template(template_text, 'en'))
-        errors = validate(text, template_text)
-        if errors and language == 'auto' and 'en' in label_maps(template_text):
-            translated_errors = validate(text, localized_template(template_text, 'en'))
-            return min((errors, translated_errors), key=len)
-        return errors
-    except ValueError as exc:
-        return [str(exc)]
 
 
 def validate(text: str, template_text: str, block: str = 'document') -> list[str]:
@@ -322,7 +225,6 @@ def main() -> int:
     parser.add_argument('document', type=Path, nargs='?')
     parser.add_argument('--template', type=Path, required=True)
     parser.add_argument('--block', default='document')
-    parser.add_argument('--language', choices=['zh', 'en'], default='zh')
     parser.add_argument('--check-template', action='store_true')
     args = parser.parse_args()
     try:
@@ -330,8 +232,7 @@ def main() -> int:
         if args.check_template:
             errors = check_template(contract)
         elif args.document:
-            errors = validate(args.document.read_text(encoding='utf-8'),
-                              localized_template(contract, args.language), args.block)
+            errors = validate(args.document.read_text(encoding='utf-8'), contract, args.block)
         else:
             parser.error('document is required unless --check-template is used')
     except (OSError, ValueError) as exc:
@@ -369,7 +270,6 @@ def artifact_cli(default_template: Path) -> int:
     parser = argparse.ArgumentParser(description='Validate against the authoritative fixed template.')
     parser.add_argument('document', type=Path, nargs='?')
     parser.add_argument('--template', type=Path, default=default_template)
-    parser.add_argument('--language', choices=['auto', 'zh', 'en'], default='auto')
     parser.add_argument('--custom-structure', '--existing-structure', action='store_true', dest='existing', help='Existing document preservation only; does not certify the fixed template.')
     parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
@@ -384,7 +284,7 @@ def artifact_cli(default_template: Path) -> int:
         if args.existing:
             errors = validate_existing(text)
         else:
-            errors = validate_artifact(text, args.template.read_text(encoding='utf-8'), args.language)
+            errors = validate(text, args.template.read_text(encoding='utf-8'))
     except OSError as exc:
         errors = [str(exc)]
     for error in errors:

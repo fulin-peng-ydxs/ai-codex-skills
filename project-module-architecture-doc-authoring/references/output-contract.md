@@ -6,8 +6,6 @@
 
 使用下方完整模板填充；标记语法及校验命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。本产物的具体填写要求见模板后的内容验收，通用生成与更新边界沿用上述全局规范。
 
-默认中文；用户指定英文时，按下方标签映射生成，运行本技能检查器加 `--language en`。映射只维护显示文字，目录、字段、重复规则和表格列仍从同一个完整模板取得，不要求用户另交模板。
-
 ## 完整模板
 
 ````document-template
@@ -48,39 +46,6 @@
 | --- | --- | --- | --- | --- |
 | {{@检查目标或缺口}} | {{@真实方法或条件}} | {{@事实/推断/缺失及依据}} | {{@实际结果或影响}} | {{@下一步或无需处理依据}} |
 ````
-
-## 英文标签
-
-```template-labels en
-{
-  "用途与范围": "Purpose and scope",
-  "读者与技术问题：": "Readers and technical question: ",
-  "用途与归属：": "Scope and ownership: ",
-  "依据范围与当前结论：": "Evidence scope and current findings: ",
-  "技术全景与边界": "Technical overview and boundaries",
-  "输入输出与调用者：": "Inputs, outputs and callers: ",
-  "组成与关系：": "Components and relationships: ",
-  "共用依赖与事实源：": "Shared dependencies and sources of truth: ",
-  "核心机制": "Core mechanisms",
-  "机制：": "Mechanism: ",
-  "目标与入口：": "Goal and entry: ",
-  "处理与结果：": "Processing and results: ",
-  "数据、权限与状态：": "Data, permissions and state: ",
-  "配置与扩展：": "Configuration and extensions: ",
-  "失败与资源边界：": "Failure handling and resource boundaries: ",
-  "局部风险与复核：": "Local risks and verification: ",
-  "接入、扩展与变更影响": "Integration, extension and change impact",
-  "消费与接入方式：": "Usage and integration: ",
-  "扩展与兼容边界：": "Extension and compatibility boundaries: ",
-  "依赖及消费方影响：": "Dependency and consumer impact: ",
-  "验证入口与已知限制": "Verification and known limitations",
-  "验证或风险事项": "Verification or risk item",
-  "条件与入口": "Conditions and entry",
-  "证据状态及位置": "Evidence status and location",
-  "结果或影响": "Result or impact",
-  "后续处理": "Follow-up"
-}
-```
 
 ## 填写与内容验收
 
