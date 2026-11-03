@@ -6,6 +6,8 @@
 
 使用下方完整模板填充；标记语法及校验命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。本产物的具体填写要求见模板后的内容验收，通用生成与更新边界沿用上述全局规范。
 
+默认中文；用户指定英文时，按下方标签映射生成，运行本技能检查器加 `--language en`。映射只维护显示文字，目录、字段、重复规则和表格列仍从同一个完整模板取得，不要求用户另交模板。
+
 ## 完整模板
 
 ````document-template
@@ -49,6 +51,38 @@
 - 项目规则与贡献入口：{{@真实AGENTS及适用贡献规则，不复制完整协作细则}}
 - 许可证与引用：{{@真实许可文件及义务；未知不推定授权}}
 ````
+
+## 英文标签
+
+```template-labels en
+{
+  "定位与读者：": "Purpose and readers: ",
+  "用途与归属：": "Scope and ownership: ",
+  "项目与适用场景": "Project and use cases",
+  "核心能力与边界：": "Capabilities and boundaries: ",
+  "运行形态与兼容范围：": "Runtime and compatibility: ",
+  "从准备到首次使用": "First run and use",
+  "前置环境与依赖：": "Prerequisites and dependencies: ",
+  "配置与数据准备：": "Configuration and data setup: ",
+  "获取与启动步骤：": "Installation and startup: ",
+  "首次使用与成功结果：": "First use and success criteria: ",
+  "停止、清理与失败入口：": "Shutdown, cleanup and troubleshooting: ",
+  "常用任务": "Common tasks",
+  "任务：": "Task: ",
+  "入口与前提：": "Entry and prerequisites: ",
+  "操作与权威来源：": "Steps and authoritative source: ",
+  "结果与验证范围：": "Results and verification scope: ",
+  "失败与清理：": "Failure handling and cleanup: ",
+  "代码入口与文档导航": "Code and documentation",
+  "路径或文档": "Path or document",
+  "职责及使用时机": "Purpose and when to use",
+  "权威正文或深入入口": "Authoritative source or further reading",
+  "结构与依赖摘要：": "Structure and dependencies: ",
+  "协作说明": "Collaboration",
+  "项目规则与贡献入口：": "Project rules and contributions: ",
+  "许可证与引用：": "License and attribution: "
+}
+```
 
 ## 填写与内容验收
 
@@ -113,6 +147,6 @@
 - 全栈或多服务项目说明启动哪些进程、哪些依赖须先准备、访问地址、请求如何到达后端及如何停止。集成启动与独立调试、日志或断点入口按实际能力说明，未经执行的 IDE 操作不得称为实测。
 - 以使用或开发任务为单元，将入口、前提、步骤、结果和失败检查放在一起；共用配置与兼容关系集中维护，任务补差异。复杂关系才使用 Mermaid，图、表和文字不重复表达同一内容。
 - 更新保留有效项目特性和已有结构；获准重构时才合并或重排，并修复变更标题的入链。删除过期事实、空章、占位内容、宣传语、历史流水和复制的专题正文。
-- 检查文件、目录、端口、版本与仓库事实；相对链接必须存在。表格避免过宽，代码块标注语言，命令解释放在块外。用户明确指定英文时保持同一信息结构，按其指定的翻译契约验收，不另在脚本维护标题清单。
+- 检查文件、目录、端口、版本与仓库事实；相对链接必须存在。表格避免过宽，代码块标注语言，命令解释放在块外；英文结构文字使用本文件映射，不另在脚本维护标题清单。
 - README 可就地展示最小操作所需的命令片段，须保留来源中的参数、执行目录、前提、成功判据及适用的停止方式，不复制完整命令目录或 AI 协作规则。需要不同参数或新命令时交上游技能维护，不在 README 中派生第二套定义。
 - 按技能入口执行结构校验，报告复用来源、上游补齐结果和内容检查。沿首次使用路径能找到下一步和成功判据，才说明入口内容完整；纸面走读或格式通过不证明本次执行过命令。
