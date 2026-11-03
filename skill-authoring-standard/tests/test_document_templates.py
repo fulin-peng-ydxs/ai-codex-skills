@@ -69,6 +69,167 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_field_slots_accept_tables_diagrams_and_block_only_values(self):
+        source = '````document-template\n# 单位\n\n## 事实\n- 成员：{{@实际成员}}\n- 验证：{{@实际状态}}\n````'
+        table = '  | unit-id | server-id |\n  | --- | --- |\n  | test-unit | test-server |\n'
+        diagram = '  ```mermaid\n  flowchart LR\n    Server --> Unit\n  ```\n'
+        command = '  ```bash\n  printf example\n  ```\n'
+        for content in [table, diagram, command, table + '\n' + diagram + '\n' + command]:
+            for inline in ['', '以下内容仅为隔离格式样例。']:
+                with self.subTest(content=content, inline=inline):
+                    document = '# 单位\n\n## 事实\n- 成员：' + inline + '\n\n' + content + '\n- 验证：未实测。\n'
+                    self.assertEqual([], check.validate(document, source))
+        # Plain fixed fields use the same continuation contract as list fields.
+        plain_source = source.replace('- 成员：', '成员：').replace('- 验证：', '验证：')
+        plain = '# 单位\n\n## 事实\n成员：\n\n' + table + '\n验证：未实测。\n'
+        self.assertEqual([], check.validate(plain, plain_source))
+
+    def test_standalone_slots_accept_mixed_blocks_between_fixed_anchors(self):
+        source = '''````document-template
+# 对照
+## 正文
+开始说明。
+{{@前置分析}}
+| 固定对象 | 固定结果 |
+| --- | --- |
+| R1 | {{@结果}} |
+{{@补充分析}}
+结束说明。
+````'''
+        extra = '| 路径 | 用途 |\n| --- | --- |\n| /example | 隔离样例 |\n'
+        required = '| 固定对象 | 固定结果 |\n| --- | --- |\n| R1 | 未执行 |\n'
+        diagram = '```mermaid\nflowchart LR\n  A --> B\n```\n'
+        document = '# 对照\n## 正文\n开始说明。\n' + extra + '\n' + required + diagram + extra + '结束说明。\n'
+        self.assertEqual([], check.validate(document, source))
+        self.assertTrue(check.validate(document.replace(required, ''), source))
+        self.assertTrue(check.validate(document.replace('结束说明。\n', '结束说明。\n' + extra), source))
+        self.assertEqual([], check.validate(document.replace('结束说明。', '结束：固定说明。'), source.replace('结束说明。', '结束：固定说明。')))
+        self.assertTrue(check.validate(document.replace('结束说明。\n', '结束：固定说明。\n' + extra), source.replace('结束说明。', '结束：固定说明。')))
+        free = '```document-template\n# 机制\n## 说明\n{{@完整机制}}\n```'
+        self.assertEqual([], check.validate('# 机制\n## 说明\n背景：隔离样例。\n' + extra + diagram, free))
+
+    def test_content_tables_do_not_replace_or_reorder_declared_tables(self):
+        source = '''````document-template
+# 对照
+## 事实
+- 分析：{{@实际分析}}
+| 固定对象 | 结果 |
+| --- | --- |
+| A | {{@结果}} |
+| B | {{@结果}} |
+- 证据：{{@证据}}
+| 验收 | 状态 |
+| --- | --- |
+| C | {{@状态}} |
+````'''
+        first = '| 固定对象 | 结果 |\n| --- | --- |\n| A | 未执行 |\n| B | 未执行 |\n'
+        second = '| 验收 | 状态 |\n| --- | --- |\n| C | 未执行 |\n'
+        nested = '  | 对象 | 属性 |\n  | --- | --- |\n  | 服务 | 版本未知 |\n'
+        prefix = '# 对照\n## 事实\n- 分析：隔离样例。\n' + nested + '\n'
+        document = prefix + first + '- 证据：尚未采集。\n' + second
+        self.assertEqual([], check.validate(document, source))
+        variants = [document.replace(first, ''),
+                    document.replace(first, ''.join('  ' + line + '\n' for line in first.splitlines())),
+                    document.replace(first, first.replace('| A | 未执行 |\n', '')),
+                    document.replace(first, first.replace('| A | 未执行 |\n| B | 未执行 |', '| B | 未执行 |\n| A | 未执行 |')),
+                    document.replace(first, first.replace('| 固定对象 | 结果 |', '| 对象 | 结果 |')),
+                    document.replace(first, first + first),
+                    prefix + second + '- 证据：尚未采集。\n' + first]
+        for document in variants:
+            with self.subTest(document=document):
+                self.assertTrue(check.validate(document, source))
+
+    def test_declared_tables_inside_field_values_remain_required(self):
+        source = '```document-template\n# 事实\n- 清单：{{@说明}}\n\n  | 成员 | 状态 |\n  | --- | --- |\n  | S1 | {{@状态}} |\n- 验证：{{@结果}}\n```'
+        extra = '  | 路径 | 用途 |\n  | --- | --- |\n  | /example | 隔离样例 |\n'
+        required = '  | 成员 | 状态 |\n  | --- | --- |\n  | S1 | 未执行 |\n'
+        document = '# 事实\n- 清单：隔离样例。\n' + extra + '\n' + required + '- 验证：待核实。\n'
+        self.assertEqual([], check.validate(document, source))
+        self.assertTrue(check.validate(document.replace(required, ''), source))
+        self.assertTrue(check.validate(document.replace(required, required + '\n' + required), source))
+
+    def test_slot_tables_keep_syntax_empty_reason_and_outer_field_checks(self):
+        source = '````document-template\n# 事实\n## 说明\n- 清单：{{@内容}}\n- 证据：{{@来源}}\n````'
+        table = '  | 对象 | 结果 |\n  | --- | --- |\n  | 服务 | 未执行 |\n'
+        document = '# 事实\n## 说明\n- 清单：\n\n' + table + '- 证据：隔离样例。\n'
+        self.assertEqual([], check.validate(document, source))
+        empty = table[:table.index('  | 服务 |')]
+        self.assertEqual([], check.validate(document.replace(table, empty + '  条目情况：无：已检查，尚无对象。\n'), source))
+        for bad in [document.replace('  | 服务 | 未执行 |', '  | 服务 |'),
+                    document.replace('  | 服务 | 未执行 |', '  | 服务 | |'),
+                    document.replace(table, empty), document.replace(table, ''),
+                    document.replace(table, empty + '条目情况：无：不属于该字段的说明。\n'),
+                    document.replace('- 证据：隔离样例。\n', ''),
+                    document.replace('- 证据：', '- 自定义字段：越界。\n- 证据：'),
+                    document + '\n## 新增章节\n越界。\n',
+                    document.replace('未执行', '{{@未填}}'),
+                    document.replace('- 清单：', '- 清单：\n  ```mermaid\n  flowchart LR\n    A --> B')]:
+            with self.subTest(document=bad):
+                self.assertTrue(check.validate(bad, source))
+        self.assertTrue(check.validate(document.replace(table, '\n'.join(line[1:] for line in table.splitlines()) + '\n'), source))
+
+    def test_content_table_separators_follow_the_header_width(self):
+        source = '```document-template\n# 对照\n## 说明\n{{@完整说明}}\n```'
+        one = '# 对照\n## 说明\n| 成员 |\n| --- |\n| S1 |\n'
+        self.assertEqual([], check.validate(one, source))
+        two = '# 对照\n## 说明\n| 成员 | 状态 |\n| --- | --- |\n| S1 | 未执行 |\n'
+        self.assertEqual([], check.validate(two, source))
+        for separator in ['| --- |', '| --- | --- | --- |']:
+            self.assertTrue(check.validate(two.replace('| --- | --- |', separator), source))
+        declared = '```document-template\n# 对照\n| 成员 | 状态 |\n| --- |\n| S1 | {{@状态}} |\n```'
+        self.assertTrue(check.check_template(declared))
+
+    def test_slot_code_does_not_change_declared_code_or_verbatim_exemptions(self):
+        source = '````document-template\n# 记录\n- 分析：{{@分析}}\n\n```text verbatim\n{{@原文}}\n```\n````'
+        diagram = '  ```mermaid\n  flowchart LR\n    A --> B\n  ```\n'
+        raw = '原文中的 {{@示例}} 与 <!-- repeat -->'
+        original = '```text\n' + raw + '\n```\n'
+        document = '# 记录\n- 分析：格式样例。\n\n' + diagram + original
+        self.assertEqual([], check.validate(document, source))
+        for bad in [document.replace(original, ''), document + original,
+                    document.replace('    A --> B', '    {{@图待填}}'),
+                    document.replace('  ```mermaid', '  ```text verbatim'),
+                    document.replace('  flowchart LR\n    A --> B\n', ''),
+                    document.replace(raw, '{{@原文}}')]:
+            with self.subTest(document=bad):
+                self.assertTrue(check.validate(bad, source))
+
+    def test_real_operation_unit_slot_can_hold_the_inventory_table(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        good = filled(check.template_blocks(source)['unit'])
+        table = '\n\n  | unit-id | server-id | 版本 |\n  | --- | --- | --- |\n  | test-unit | test-server | 未核实 |\n'
+        document = good.replace('- 成员、环境与版本：样例1', '- 成员、环境与版本：隔离格式样例。' + table)
+        self.assertEqual([], check.validate(document, source, 'unit'))
+
+    def test_declared_nested_code_is_not_swallowed_by_its_field_slot(self):
+        source = '````document-template\n# 操作\n- 步骤：{{@说明}}\n\n  ```bash\n  {{@精确命令}}\n  ```\n- 验证：{{@结果}}\n````'
+        declared = '  ```bash\n  printf example\n  ```\n'
+        diagram = '  ```mermaid\n  flowchart LR\n    A --> B\n  ```\n'
+        document = '# 操作\n- 步骤：隔离格式样例。\n\n' + diagram + declared + '- 验证：未实测。\n'
+        self.assertEqual([], check.validate(document, source))
+        self.assertTrue(check.validate(document.replace(declared, ''), source))
+        self.assertTrue(check.validate(document.replace(declared, declared + declared), source))
+        self.assertTrue(check.validate(document.replace('  ```bash', '  ```text'), source))
+
+    def test_literal_anchors_disambiguate_identical_headers_and_code_languages(self):
+        source = '''````document-template
+# 对照
+## 正文
+{{@分析}}
+以下是固定结果。
+| 对象 | 结果 |
+| --- | --- |
+| R1 | {{@结果}} |
+```bash
+{{@固定命令}}
+```
+````'''
+        extra = '| 对象 | 结果 |\n| --- | --- |\n| 临时对照 | 仅说明 |\n\n```bash\nprintf content\n```\n'
+        required = '| 对象 | 结果 |\n| --- | --- |\n| R1 | 未执行 |\n```bash\nprintf required\n```\n'
+        document = '# 对照\n## 正文\n' + extra + '以下是固定结果。\n' + required
+        self.assertEqual([], check.validate(document, source))
+        self.assertTrue(check.validate(document.replace(required, ''), source))
+
     def test_fixed_business_fields_allow_rich_explanation_and_still_reject_omissions(self):
         cases = [
             ('requirement-closure-design/references/closure-template.md', '功能点：', '前置、操作与反馈'),

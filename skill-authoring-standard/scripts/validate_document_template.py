@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 import re
 import sys
@@ -65,20 +66,22 @@ def code_fences(lines: list[str]) -> list[CodeFence]:
     return result
 
 
-def check_code(expected: Node, actual: Node, where: str) -> list[str]:
+def check_code(expected: Node, actual: Node, where: str, content_blocks: set[int] | None = None) -> list[str]:
     expected_blocks = code_fences(expected.body)
     actual_blocks = code_fences(actual.body)
+    fixed_blocks = [block for block in actual_blocks if block.start not in (content_blocks or set())]
     errors = []
-    matching_count = len(expected_blocks) == len(actual_blocks)
+    matching_count = len(expected_blocks) == len(fixed_blocks)
     if expected_blocks and not matching_count:
         errors.append(f'{where}: declared code block count differs from template')
     literal_lines = set()
-    for index, block in enumerate(actual_blocks):
+    declared_blocks = {block.start: declared for block, declared in zip(fixed_blocks, expected_blocks)} if matching_count else {}
+    for block in actual_blocks:
         if 'verbatim' in block.info.split():
             errors.append(f'{where}: document contains a template-only verbatim marker')
-        declared = expected_blocks[index] if matching_count and index < len(expected_blocks) else None
-        if declared and not block.content.strip():
-            errors.append(f'{where}: declared code block is empty')
+        declared = declared_blocks.get(block.start)
+        if not block.content.strip():
+            errors.append(f'{where}: code block is empty')
         if declared and declared.info == VERBATIM:
             if block.content.strip() == declared.content.strip():
                 errors.append(f'{where}: verbatim source slot is still unfilled')
@@ -156,7 +159,7 @@ def title_matches(pattern: str, title: str) -> bool:
 def table_headers(lines: list[str]) -> list[tuple[int, str]]:
     result = []
     for index in range(len(lines) - 1):
-        if lines[index].strip().startswith('|') and re.fullmatch(r'\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*', lines[index + 1]):
+        if lines[index].strip().startswith('|') and re.fullmatch(r'\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?\s*', lines[index + 1]):
             result.append((index, '|'.join(table_cells(lines[index]))))
     return result
 
@@ -182,7 +185,10 @@ def table_absences(body: list[str], prose: list[str]) -> dict[int, int]:
         if table_rows(prose, index):
             continue
         following = next((i for i in range(index + 2, len(body)) if body[i].strip()), None)
-        if following is not None and TABLE_ABSENT.fullmatch(body[following]):
+        indent = len(body[index]) - len(body[index].lstrip())
+        if (following is not None
+                and len(body[following]) - len(body[following].lstrip()) == indent
+                and TABLE_ABSENT.fullmatch(body[following].strip())):
             bindings[index] = following
     return bindings
 
@@ -211,8 +217,143 @@ def rows_match(schema: list[list[str]], rows: list[list[str]]) -> bool:
     return len(rows) in positions
 
 
+@dataclass(frozen=True)
+class BodyBlock:
+    kind: str
+    start: int
+    end: int
+    owner: tuple[str, str] | None = None
+    identity: str | tuple[str, str] = ''
+
+
+def body_blocks(lines: list[str], labels: set[str], *, template: bool,
+                include_code: bool, anchors: list[str]) -> list[BodyBlock]:
+    """Keep field ownership and declared block positions; headings belong to Node."""
+    prose = body_prose(lines)
+    tables = dict(table_headers(prose))
+    fences = {block.start: block for block in code_fences(lines)}
+    result = []
+    owner = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if line.strip() and len(line) - len(line.lstrip(' ')) < 2:
+            owner = None
+        match = FIELD.match(line)
+        if match and match[1] in labels:
+            owner = ('- ' if line.startswith('- ') else '', match[1])
+            result.append(BodyBlock('field', index, index + 1, identity=owner))
+            if template and PLACEHOLDER.search(match[2]):
+                result.append(BodyBlock('slot', index, index + 1, owner))
+            index += 1
+            continue
+        if index in fences:
+            block = fences[index]
+            if include_code:
+                result.append(BodyBlock('code', index, block.end, owner, block.info.split()[0] if block.info else ''))
+            index = block.end
+            continue
+        if index in tables:
+            end = index + 2 + len(table_rows(prose, index))
+            result.append(BodyBlock('table', index, end, owner, tables[index]))
+            index = end
+            continue
+        if template and PLACEHOLDER.fullmatch(line.strip()):
+            result.append(BodyBlock('slot', index, index + 1, owner))
+        elif owner is None and line.strip() and any(title_matches(anchor, line.strip()) for anchor in anchors):
+            result.append(BodyBlock('anchor', index, index + 1, identity=line.strip()))
+        index += 1
+    return result
+
+
+def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bool]:
+    """Match required blocks in order; only a real content slot consumes extras.
+
+    A field slot owns its indented continuation. A standalone slot runs between
+    its surrounding fixed blocks. Matching carries ownership so an indented
+    copy of a required outer table cannot replace the missing original.
+    """
+    prose = body_prose(expected.body)
+    labels = {match[1] for line in prose
+              if (match := FIELD.match(line)) and PLACEHOLDER.search(match[2])}
+    include_code = bool(code_fences(expected.body))
+    # Literal lines only act as boundaries when the template declares a prose
+    # slot; other prose keeps the existing validator's preservation behavior.
+    anchors = []
+    if any(PLACEHOLDER.fullmatch(line.strip()) for line in prose):
+        excluded = set()
+        for index, _ in table_headers(prose):
+            excluded.update(range(index, index + 2 + len(table_rows(prose, index))))
+        for index, line in enumerate(prose):
+            if (index not in excluded and line.strip() and not line[:1].isspace()
+                    and not ((match := FIELD.match(line)) and match[1] in labels)
+                    and not PLACEHOLDER.fullmatch(line.strip())):
+                anchors.append(line.strip())
+    pattern = body_blocks(expected.body, labels, template=True, include_code=include_code, anchors=anchors)
+    observed = body_blocks(actual.body, labels, template=False, include_code=include_code, anchors=anchors)
+
+    def reserved_blocks(position: int) -> set[tuple]:
+        # Fields and literal anchors disambiguate equal headers/languages in
+        # different slots. Within one segment a required block cannot become
+        # an optional extra merely because its rows/content were changed.
+        start, end = position, position + 1
+        while start and pattern[start - 1].kind not in ('field', 'anchor'):
+            start -= 1
+        while end < len(pattern) and pattern[end].kind not in ('field', 'anchor'):
+            end += 1
+        return {(block.kind, block.owner, block.identity) for block in pattern[start:end]
+                if block.kind in ('table', 'code')}
+
+    reserved = {index: reserved_blocks(index) for index, block in enumerate(pattern) if block.kind == 'slot'}
+
+    @lru_cache(maxsize=None)
+    def match(position: int, offset: int) -> tuple[int, ...] | None:
+        if position == len(pattern):
+            return () if offset == len(observed) else None
+        wanted = pattern[position]
+        if wanted.kind == 'slot':
+            tail = match(position + 1, offset)
+            if tail is not None:
+                return tail
+            if offset < len(observed):
+                current = observed[offset]
+                if (current.kind in ('table', 'code') and current.owner == wanted.owner
+                        and (current.kind, current.owner, current.identity) not in reserved[position]):
+                    tail = match(position, offset + 1)
+                    if tail is not None:
+                        return (offset,) + tail
+            return None
+        if offset == len(observed):
+            return None
+        current = observed[offset]
+        same_identity = (title_matches(str(wanted.identity), str(current.identity))
+                         if wanted.kind == 'anchor' else wanted.identity == current.identity)
+        if wanted.kind == current.kind and wanted.owner == current.owner and same_identity:
+            return match(position + 1, offset + 1)
+        return None
+
+    consumed = match(0, 0)
+    if consumed is None:
+        return set(), set(), False
+    return ({observed[i].start for i in consumed if observed[i].kind == 'table'},
+            {observed[i].start for i in consumed if observed[i].kind == 'code'}, True)
+
+
+def field_has_content(lines: list[str], index: int, value: str) -> bool:
+    """A block-only value is valid, but another outer field cannot fill it."""
+    if value.strip():
+        return True
+    continuation = []
+    for line in lines[index + 1:]:
+        if line.strip() and len(line) - len(line.lstrip(' ')) < 2:
+            break
+        continuation.append(line[2:] if line.startswith('  ') else line)
+    return has_content('\n'.join(continuation))
+
+
 def check_body(expected: Node, actual: Node, where: str, flexible: bool = False) -> list[str]:
-    errors = check_code(expected, actual, where)
+    content_tables, content_code, matched = content_blocks(expected, actual) if not flexible else (set(), set(), True)
+    errors = check_code(expected, actual, where, content_code)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
     actual_lines = body_prose(actual.body)
     fields = []
@@ -224,7 +365,7 @@ def check_body(expected: Node, actual: Node, where: str, flexible: bool = False)
             fields.append(('- ' if line.startswith('- ') else '', match[1]))
     labels = {label for _, label in fields}
     observed_fields = []
-    for line in actual_lines:
+    for index, line in enumerate(actual_lines):
         # Indented lines continue a field; quotes and table cells are content,
         # not declarations in the current section's fixed field namespace.
         if line[:1].isspace() or line.startswith(('|', '>')):
@@ -233,7 +374,7 @@ def check_body(expected: Node, actual: Node, where: str, flexible: bool = False)
         if match and match[1] in labels:
             prefix = line[:len(line) - len(line.lstrip())] + ('- ' if line.lstrip().startswith('- ') else '')
             observed_fields.append((prefix, match[1]))
-            if not match[2].strip():
+            if not field_has_content(actual.body, index, match[2]):
                 errors.append(f'{where}: empty field {match[1]}')
         elif fields and match and not ABSENT.fullmatch(line):
             errors.append(f'{where}: unexpected field {match[1]}')
@@ -241,18 +382,23 @@ def check_body(expected: Node, actual: Node, where: str, flexible: bool = False)
         errors.append(f'{where}: fields missing, duplicated or out of order; expected {fields}, found {observed_fields}')
     expected_tables = table_headers(expected_lines)
     actual_tables = table_headers(actual_lines)
+    fixed_tables = [(index, header) for index, header in actual_tables if index not in content_tables]
     absence_bindings = table_absences(actual.body, actual_lines)
-    if not flexible and [header for _, header in actual_tables] != [header for _, header in expected_tables]:
+    if not flexible and not matched:
+        errors.append(f'{where}: fixed body blocks are missing, duplicated, out of order or outside their declared scope')
+    if not flexible and [header for _, header in fixed_tables] != [header for _, header in expected_tables]:
         errors.append(f'{where}: table columns or table order differ from template')
-    for table_index, (index, header) in enumerate(actual_tables):
+    schemas = {index: table_rows(expected_lines, declared[0]) for (index, _), declared in zip(fixed_tables, expected_tables)}
+    for index, header in actual_tables:
         column_count = len(table_cells(actual_lines[index]))
+        if len(table_cells(actual_lines[index + 1])) != column_count:
+            errors.append(f'{where}: table separator columns differ from header')
         data = table_rows(actual_lines, index)
         for cells in data:
             if len(cells) != column_count or any(not cell for cell in cells):
                 errors.append(f'{where}: table row has missing/empty columns')
-        if not flexible and table_index < len(expected_tables):
-            schema = table_rows(expected_lines, expected_tables[table_index][0])
-            if not rows_match(schema, data):
+        if not flexible and index in schemas:
+            if not rows_match(schemas[index], data):
                 errors.append(f'{where}: fixed table rows or row patterns are missing, duplicated, unexpected or out of order')
         if not data and index not in absence_bindings:
             errors.append(f'{where}: table {header!r} has no records and no immediately following table-specific absence reason')
@@ -340,6 +486,8 @@ def check_template(text: str) -> list[str]:
             for index, _ in table_headers(lines):
                 rows = table_rows(lines, index)
                 columns = len(table_cells(lines[index]))
+                if len(table_cells(lines[index + 1])) != columns:
+                    errors.append(f'{name}: template table separator columns differ from header')
                 if any(len(row) != columns or any(not cell for cell in row) for row in rows):
                     errors.append(f'{name}: template table row has missing/empty columns')
                 identities = [row[0] for row in rows if row and not PLACEHOLDER.search(row[0])]
