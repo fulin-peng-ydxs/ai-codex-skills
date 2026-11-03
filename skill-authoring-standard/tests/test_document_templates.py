@@ -69,6 +69,50 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_fixed_business_fields_allow_rich_explanation_and_still_reject_omissions(self):
+        cases = [
+            ('requirement-closure-design/references/closure-template.md', '功能点：', '前置、操作与反馈'),
+            ('requirement-doc-authoring/references/requirement-template.md', 'R', '输入、操作与校验'),
+            ('development-workflow/references/output-template.md', 'T', '实施方案'),
+            ('project-module-architecture-doc-authoring/references/output-contract.md', '机制：', '处理与结果'),
+            ('business-closed-loop-analysis/references/output-contract.md', '环节：', '处理与校验'),
+            ('project-handover-analysis/assets/project-handover-report-template.md', '链路：', '调用与交接'),
+        ]
+        def find(node, prefix):
+            for child in node.children:
+                if child.title.startswith(prefix):
+                    return child
+                found = find(child, prefix)
+                if found:
+                    return found
+        for path, prefix, field in cases:
+            with self.subTest(template=path):
+                source = (ROOT / path).read_text()
+                skeleton = check.template_blocks(source)['document']
+                good = filled(skeleton)
+                original = f'- {field}：样例1'
+                self.assertIn(original, good)
+                expanded = f'''- {field}：隔离格式样例，不代表实际项目事实。
+  1. 校验身份和必填项后提交；缺项时保留原内容并提示原因，检查状态不变。
+  2. 更新状态并创建唯一任务；失败时回滚，重复请求返回原结果，判据是只产生一个任务。尚未运行验证。
+  ```mermaid
+  flowchart LR
+    A[草稿] --> B[待审核与唯一任务]
+  ```'''
+                document = good.replace(original, expanded, 1)
+                self.assertEqual([], check.validate(document, source))
+                self.assertEqual([], check.validate(good.replace(original, f'- {field}：未知：缺少接口或源码依据，影响判断；补齐后再复核。', 1), source))
+                unit = find(check.parse_tree(skeleton, True), prefix)
+                self.assertIsNotNone(unit)
+                for line in unit.body:
+                    match = check.FIELD.match(line)
+                    if match and check.PLACEHOLDER.search(match[2]):
+                        missing = re.sub(r'^(?:- )?' + re.escape(match[1]) + r'.*\n', '', good, count=1, flags=re.M)
+                        self.assertTrue(good != missing, match[1])
+                        self.assertTrue(check.validate(missing, source), match[1])
+                self.assertTrue(check.validate(document.replace(expanded, expanded + '\n##### 临时子标题\n额外内容。', 1), source))
+                self.assertTrue(check.validate(document.replace(expanded, expanded + '\n| 临时列 | 内容 |\n| --- | --- |\n| A | B |', 1), source))
+
     def test_skill_body_allows_useful_local_structure_inside_fixed_topics(self):
         source = (ROOT / 'skill-authoring-standard/references/skill-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
