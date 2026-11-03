@@ -68,6 +68,107 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_fixed_table_dimensions_cannot_be_removed_duplicated_or_reordered(self):
+        source = (ROOT / 'project-handover-analysis/assets/project-handover-report-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        lines = good.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.startswith('| 维度 |')) + 2
+        rows = lines[start:start + 8]
+        self.assertEqual(8, len(rows))
+        variants = [rows[:1], rows + rows[:1], list(reversed(rows)),
+                    rows + [rows[0].replace('源码', '额外维度')],
+                    ['条目情况：不适用：固定维度不能因此省略。']]
+        variants.extend(rows[:i] + rows[i + 1:] for i in range(len(rows)))
+        for replacement in variants:
+            with self.subTest(rows=replacement):
+                bad = '\n'.join(lines[:start] + replacement + lines[start + 8:])
+                self.assertTrue(check.validate(bad, source))
+
+    def test_fixed_and_variable_table_rows_follow_the_authoritative_patterns(self):
+        source = '''```document-template
+# 隔离表格样例
+| 标识 | 内容 |
+| --- | --- |
+| 开端 | 固定内容 |
+| 项{{@编号}} | {{@实际内容}} |
+| 末尾 | {{@实际结果}} |
+```'''
+        first = '# 隔离表格样例\n| 标识 | 内容 |\n| --- | --- |\n| 开端 | 固定内容 |\n'
+        last = '| 末尾 | 未执行：隔离格式样例 |\n'
+        for middle in ['', '| 项1 | 一项 |\n', '| 项1 | 一项 |\n| 项2 | 二项 |\n']:
+            self.assertEqual([], check.validate(first + middle + last, source))
+        for bad in [first.replace('固定内容', '被改写') + last,
+                    first + '| 任意身份 | 越过原型 |\n' + last,
+                    first + last + '| 项1 | 错误位置 |\n', first + first.splitlines()[-1] + '\n' + last]:
+            self.assertTrue(check.validate(bad, source))
+        duplicate = source.replace('| 末尾 | {{@实际结果}} |', '| 开端 | {{@实际结果}} |')
+        self.assertTrue(check.check_template(duplicate))
+        header_only = '```document-template\n# 自由数据表\n| 标识 | 内容 |\n| --- | --- |\n```'
+        self.assertEqual([], check.validate('# 自由数据表\n| 标识 | 内容 |\n| --- | --- |\n| 真实对象 | 非空记录 |\n', header_only))
+
+    def test_indented_template_wrappers_are_rejected_but_declared_sources_are_preserved(self):
+        source = '````document-template\n# 隔离样例\n\n## 正文\n{{@实际正文}}\n````'
+        good = '# 隔离样例\n\n## 正文\n仅验证格式，不作为实际项目证据。\n'
+        self.assertEqual([], check.validate(good, source))
+        for indent in range(4):
+            for fence in ['```', '~~~~']:
+                with self.subTest(indent=indent, fence=fence):
+                    wrapper = ' ' * indent + fence + 'document-template named\n包装泄漏\n' + ' ' * indent + fence + '\n'
+                    self.assertTrue(check.validate(good + wrapper, source))
+                    nested = good + '`````text\n' + wrapper + '`````\n'
+                    self.assertTrue(check.validate(nested, source))
+                    literal = '````document-template\n# 隔离样例\n\n## 正文\n```text verbatim\n{{@用户原文}}\n```\n````'
+                    document = '# 隔离样例\n\n## 正文\n`````text\n' + wrapper + '`````\n'
+                    self.assertEqual([], check.validate(document, literal))
+
+    def test_business_state_machines_repeat_as_complete_object_units(self):
+        source = (ROOT / 'business-closed-loop-analysis/references/output-contract.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        start, end = good.index('### 状态机：'), good.index('## 三、')
+        unit = good[start:end]
+        first = unit.replace('### 状态机：样例1', '### 状态机：审批单')
+        second = unit.replace('### 状态机：样例1', '### 状态机：执行任务')
+        two = good[:start] + first + second + good[end:]
+        self.assertEqual([], check.validate(two, source))
+        absent = good[:start] + '条目情况：不适用：隔离查询场景不维护对象状态。\n\n' + good[end:]
+        self.assertEqual([], check.validate(absent, source))
+        self.assertTrue(check.validate(good[:start] + good[end:], source))
+        unknown = good.replace('- 状态语义与联动：样例1', '- 状态语义与联动：未知：缺少状态来源，无法确认终态；取得源码后补证。')
+        self.assertEqual([], check.validate(unknown, source))
+        for bad in [good[:start] + first + first + good[end:],
+                    two.replace('- 状态语义与联动：样例1\n', '', 1),
+                    two.replace('| 当前状态 |', '| 自定义状态 |', 1)]:
+            self.assertTrue(check.validate(bad, source))
+        # The former output put a second bare state table in the parent section.
+        table = unit[unit.index('| 当前状态 |'):]
+        self.assertTrue(check.validate(good[:start] + table + table + good[end:], source))
+
+    def test_requirement_goal_tables_cover_local_shared_absent_and_unknown_targets(self):
+        source = (ROOT / 'requirement-doc-authoring/references/requirement-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        header = '| 目标标识 / 关联需求 |'
+        lines = good.splitlines()
+        starts = [i for i, line in enumerate(lines) if line.startswith(header)]
+        self.assertEqual(2, len(starts))
+        more = lines[:]
+        for index in reversed(starts):
+            more.insert(index + 3, '| 目标2 / R1、R2 | 安全 / 隔离样例入口 | 禁止越权读取 | 以角色范围为依据 | A2 |')
+        self.assertEqual([], check.validate('\n'.join(more), source))
+        for index in starts:
+            missing_table = '\n'.join(lines[:index] + lines[index + 3:])
+            self.assertTrue(check.validate(missing_table, source))
+        absent = lines[:]
+        unknown = lines[:]
+        for index in reversed(starts):
+            absent[index + 2] = '条目情况：不适用：已核对隔离样例，没有该层级的实质目标。'
+            unknown[index + 2] = '| 待定目标 / R1 | 性能 / 查询 | 待确认：响应目标未知 | 缺少负载基线，影响阈值制定；补测后确认 | A1待补充 |'
+        self.assertEqual([], check.validate('\n'.join(absent), source))
+        self.assertEqual([], check.validate('\n'.join(unknown), source))
+        no_reason = [line for i, line in enumerate(lines) if i not in {n + 2 for n in starts}]
+        self.assertTrue(check.validate('\n'.join(no_reason), source))
+
     def test_duplicate_template_and_document_headings_are_rejected(self):
         duplicate = '```document-template\n# 报告\n\n## 结论\n第一项。\n\n## 结论\n第二项。\n```'
         self.assertTrue(check.check_template(duplicate))

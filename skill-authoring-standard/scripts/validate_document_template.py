@@ -82,8 +82,15 @@ def check_code(expected: Node, actual: Node, where: str) -> list[str]:
     checked = '\n'.join(line for index, line in enumerate(actual.body) if index not in literal_lines)
     if '{{@' in checked or '<!-- repeat' in checked:
         errors.append(f'{where}: body contains unfilled placeholders or template markers')
-    if any('document-template' in line for line in checked.splitlines() if line.startswith(('```', '~~~'))):
-        errors.append(f'{where}: document contains a template wrapper')
+    pending = code_fences(checked.splitlines())
+    while pending:
+        block = pending.pop()
+        if 'document-template' in block.info:
+            errors.append(f'{where}: document contains a template wrapper')
+            break
+        # Ordinary code cannot hide a wrapper inside a longer outer fence.
+        # Declared verbatim sources were removed from checked above.
+        pending.extend(code_fences(block.content.splitlines()))
     return errors
 
 
@@ -147,6 +154,39 @@ def table_headers(lines: list[str]) -> list[tuple[int, str]]:
     return result
 
 
+def table_rows(lines: list[str], header_index: int) -> list[list[str]]:
+    rows = []
+    for line in lines[header_index + 2:]:
+        if not line.strip().startswith('|'):
+            break
+        rows.append(table_cells(line))
+    return rows
+
+
+def rows_match(schema: list[list[str]], rows: list[list[str]]) -> bool:
+    """Literal first cells identify fixed rows; variable first cells repeat in place."""
+    if not schema:
+        return True  # A header-only template declares no row identities or patterns.
+    fixed_ids = {row[0] for row in schema if not PLACEHOLDER.search(row[0])}
+    positions = {0}
+    for pattern in schema:
+        repeated = bool(PLACEHOLDER.search(pattern[0]))
+        def matches(row):
+            return (len(row) == len(pattern)
+                    and (not repeated or row[0] not in fixed_ids)
+                    and all(title_matches(part, value) for part, value in zip(pattern, row)))
+        if repeated:
+            # Keep all valid endpoints so overlapping variable patterns do not
+            # greedily consume later rows. Iteration also handles long tables.
+            for position in range(len(rows)):
+                if position in positions and matches(rows[position]):
+                    positions.add(position + 1)
+        else:
+            positions = {position + 1 for position in positions
+                         if position < len(rows) and matches(rows[position])}
+    return len(rows) in positions
+
+
 def check_body(expected: Node, actual: Node, where: str) -> list[str]:
     errors = check_code(expected, actual, where)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
@@ -175,20 +215,20 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
             errors.append(f'{where}: unexpected field {match[1]}')
     if observed_fields != fields:
         errors.append(f'{where}: fields missing, duplicated or out of order; expected {fields}, found {observed_fields}')
-    expected_tables = [header for _, header in table_headers(expected_lines)]
+    expected_tables = table_headers(expected_lines)
     actual_tables = table_headers(actual_lines)
-    if [header for _, header in actual_tables] != expected_tables:
+    if [header for _, header in actual_tables] != [header for _, header in expected_tables]:
         errors.append(f'{where}: table columns or table order differ from template')
-    for index, header in actual_tables:
+    for table_index, (index, header) in enumerate(actual_tables):
         column_count = len(table_cells(actual_lines[index]))
-        data = []
-        for row in actual_lines[index + 2:]:
-            if not row.strip().startswith('|'):
-                break
-            cells = table_cells(row)
+        data = table_rows(actual_lines, index)
+        for cells in data:
             if len(cells) != column_count or any(not cell for cell in cells):
                 errors.append(f'{where}: table row has missing/empty columns')
-            data.append(row)
+        if table_index < len(expected_tables):
+            schema = table_rows(expected_lines, expected_tables[table_index][0])
+            if not rows_match(schema, data):
+                errors.append(f'{where}: fixed table rows or row patterns are missing, duplicated, unexpected or out of order')
         if not data and not ABSENT.search('\n'.join(actual_lines)):
             errors.append(f'{where}: table has no records and no explicit absence reason')
     if (fields or expected_tables or (not expected.children and has_content('\n'.join(expected.body)))) and not has_content('\n'.join(actual.body)):
@@ -246,6 +286,15 @@ def check_template(text: str) -> list[str]:
             errors.append(f'{name}: template has no headings')
         def walk(node):
             patterns = set()
+            lines = prose_without_fences('\n'.join(node.body)).splitlines()
+            for index, _ in table_headers(lines):
+                rows = table_rows(lines, index)
+                columns = len(table_cells(lines[index]))
+                if any(len(row) != columns or any(not cell for cell in row) for row in rows):
+                    errors.append(f'{name}: template table row has missing/empty columns')
+                identities = [row[0] for row in rows if row and not PLACEHOLDER.search(row[0])]
+                if len(identities) != len(set(identities)):
+                    errors.append(f'{name}: duplicate fixed table row identity')
             for block in code_fences(node.body):
                 if 'verbatim' in block.info.split() and (
                         block.info != VERBATIM or not PLACEHOLDER.fullmatch(block.content.strip())):
