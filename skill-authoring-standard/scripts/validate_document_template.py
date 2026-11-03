@@ -4,22 +4,30 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 import re
 import sys
+from textwrap import dedent
 
 _parser_dir = Path(__file__).resolve().parents[2] / 'ai-constraint-doc-authoring/scripts'
 if not (_parser_dir / 'document_markdown.py').is_file():
     raise SystemExit('Missing dependency: install ai-constraint-doc-authoring beside this skill.')
 sys.path.insert(0, str(_parser_dir))
-from document_markdown import fenced_lines, fences_closed, has_content, prose_without_fences, table_cells
+import document_markdown as markdown
+from document_markdown import FIELD_LINE as FIELD, table_cells
+
+# All validation phases must use the same field-relative fence view while
+# preserving source lines for ownership, literal records and diagnostics.
+fenced_lines = partial(markdown.fenced_lines, field_continuations=True)
+fences_closed = partial(markdown.fences_closed, field_continuations=True)
+has_content = partial(markdown.has_content, field_continuations=True)
+prose_without_fences = partial(markdown.prose_without_fences, field_continuations=True)
 
 PLACEHOLDER = re.compile(r'\{\{@[^{}\n]+\}\}')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
 REPEAT = re.compile(r'\s*<!-- repeat(?P<required>-required)? -->\s*$')
 FLEXIBLE = re.compile(r'\s*<!-- flexible-body -->\s*$')
-FIELD = re.compile(r'^(?:- )?([^\n：:]+[：:])(.*)$')
 UNFINISHED = re.compile(r'\{\{@|\b(?:TODO|TBD)\s*:|<!-- flexible-body\b', re.I)
 ABSENCE_VALUE = r'(?:无|不适用)[：:，； ]+\S[^\n]*'
 ABSENT = re.compile(r'^(?:- )?(?:条目情况|适用性)：' + ABSENCE_VALUE + r'$', re.M)
@@ -97,7 +105,7 @@ def check_code(expected: Node, actual: Node, where: str, content_blocks: set[int
             break
         # Ordinary code cannot hide a wrapper inside a longer outer fence.
         # Declared verbatim sources were removed from checked above.
-        pending.extend(code_fences(block.content.splitlines()))
+        pending.extend(code_fences(dedent(block.content).splitlines()))
     return errors
 
 
@@ -227,7 +235,7 @@ class BodyBlock:
 
 
 def body_blocks(lines: list[str], labels: set[str], *, template: bool,
-                include_code: bool, anchors: list[str]) -> list[BodyBlock]:
+                anchors: list[str]) -> list[BodyBlock]:
     """Keep field ownership and declared block positions; headings belong to Node."""
     prose = body_prose(lines)
     tables = dict(table_headers(prose))
@@ -249,8 +257,7 @@ def body_blocks(lines: list[str], labels: set[str], *, template: bool,
             continue
         if index in fences:
             block = fences[index]
-            if include_code:
-                result.append(BodyBlock('code', index, block.end, owner, block.info.split()[0] if block.info else ''))
+            result.append(BodyBlock('code', index, block.end, owner, block.info.split()[0] if block.info else ''))
             index = block.end
             continue
         if index in tables:
@@ -276,7 +283,6 @@ def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bo
     prose = body_prose(expected.body)
     labels = {match[1] for line in prose
               if (match := FIELD.match(line)) and PLACEHOLDER.search(match[2])}
-    include_code = bool(code_fences(expected.body))
     # Literal lines only act as boundaries when the template declares a prose
     # slot; other prose keeps the existing validator's preservation behavior.
     anchors = []
@@ -289,8 +295,8 @@ def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bo
                     and not ((match := FIELD.match(line)) and match[1] in labels)
                     and not PLACEHOLDER.fullmatch(line.strip())):
                 anchors.append(line.strip())
-    pattern = body_blocks(expected.body, labels, template=True, include_code=include_code, anchors=anchors)
-    observed = body_blocks(actual.body, labels, template=False, include_code=include_code, anchors=anchors)
+    pattern = body_blocks(expected.body, labels, template=True, anchors=anchors)
+    observed = body_blocks(actual.body, labels, template=False, anchors=anchors)
 
     def reserved_blocks(position: int) -> set[tuple]:
         # Fields and literal anchors disambiguate equal headers/languages in
@@ -348,7 +354,8 @@ def field_has_content(lines: list[str], index: int, value: str) -> bool:
         if line.strip() and len(line) - len(line.lstrip(' ')) < 2:
             break
         continuation.append(line[2:] if line.startswith('  ') else line)
-    return has_content('\n'.join(continuation))
+    content = '\n'.join(continuation)
+    return fences_closed(content) and has_content(content)
 
 
 def check_body(expected: Node, actual: Node, where: str, flexible: bool = False) -> list[str]:

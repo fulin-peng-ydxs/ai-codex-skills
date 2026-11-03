@@ -69,6 +69,50 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_owned_code_fences_use_field_relative_indentation(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        good = filled(check.template_blocks(source)['unit'])
+        field = '- 精确命令与步骤：样例1'
+        for indent in [2, 3, 4, 5]:
+            for fence in ['```', '~~~~']:
+                for inline in ['', '仅为隔离格式样例，未执行。']:
+                    with self.subTest(indent=indent, fence=fence, inline=inline):
+                        pad = ' ' * indent
+                        opening = field.replace('样例1', inline) + '\n\n' + pad + fence + 'bash\n'
+                        body = pad + 'printf example\n'
+                        closing = pad + fence + '\n'
+                        closed = good.replace(field, opening + body + closing, 1)
+                        self.assertEqual([], check.validate(closed, source, 'unit'))
+                        broken = good.replace(field, opening + body, 1)
+                        errors = check.validate(broken, source, 'unit')
+                        self.assertTrue(any('unclosed code fence' in error for error in errors), errors)
+                        empty = good.replace(field, opening + closing, 1)
+                        self.assertTrue(check.validate(empty, source, 'unit'))
+        # A fixed code block inside a field uses the same relative fence view.
+        declared = '````document-template\n# 命令\n- 步骤：{{@说明}}\n\n    ```bash\n    {{@命令}}\n    ```\n````'
+        closed = '# 命令\n- 步骤：静态样例。\n\n    ```bash\n    printf example\n    ```\n'
+        self.assertEqual([], check.validate(closed, declared))
+        wrapper = '- 精确命令与步骤：\n\n    `````text\n    ```document-template\n    # 未授权模板包装\n    ```\n    `````\n'
+        self.assertTrue(check.validate(good.replace(field, wrapper, 1), source, 'unit'))
+
+    def test_all_code_blocks_need_a_declared_location_without_fixed_code(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        good = filled(check.template_blocks(source)['unit'])
+        diagram = '```mermaid\nflowchart LR\n  A --> B\n```\n'
+        for indent in [0, 1]:
+            block = ''.join(' ' * indent + line + '\n' for line in diagram.splitlines())
+            before = good.replace('## 1. 单位范围与运行事实\n', '## 1. 单位范围与运行事实\n\n' + block, 1)
+            between = good.replace('- 成员、环境与版本：', block + '- 成员、环境与版本：', 1)
+            after = good + '\n' + block
+            for text in [before, between, after]:
+                with self.subTest(indent=indent, document=text):
+                    self.assertTrue(check.validate(text, source, 'unit'))
+        nested = ''.join('    ' + line + '\n' for line in diagram.splitlines())
+        inside = good.replace('- 成员、环境与版本：样例1', '- 成员、环境与版本：\n\n' + nested, 1)
+        self.assertEqual([], check.validate(inside, source, 'unit'))
+        free = '```document-template\n# 机制\n## 说明\n{{@完整机制}}\n```'
+        self.assertEqual([], check.validate('# 机制\n## 说明\n' + diagram, free))
+
     def test_field_slots_accept_tables_diagrams_and_block_only_values(self):
         source = '````document-template\n# 单位\n\n## 事实\n- 成员：{{@实际成员}}\n- 验证：{{@实际状态}}\n````'
         table = '  | unit-id | server-id |\n  | --- | --- |\n  | test-unit | test-server |\n'
@@ -592,7 +636,11 @@ class FixedDocumentTests(unittest.TestCase):
                 self.assertTrue(check.validate(text, CONTRACT))
 
     def test_code_headings_do_not_change_document_structure(self):
-        text = GOOD.replace('## 验证覆盖', '```python\n# implementation note\n## not a document heading\n```\n\n## 验证覆盖')
+        outside = GOOD.replace('## 验证覆盖', '```python\n# implementation note\n## not a document heading\n```\n\n## 验证覆盖')
+        self.assertTrue(check.validate(outside, CONTRACT))
+        # Code is valid in the declared field, and its headings stay literal.
+        text = GOOD.replace('- 证据：模拟 fixture 的入口未调用授权检查。',
+                            '- 证据：模拟 fixture 的入口未调用授权检查。\n  ```python\n  # implementation note\n  ## not a document heading\n  ```')
         self.assertEqual([], check.validate(text, CONTRACT))
 
     def test_unclosed_code_fences_cannot_hide_trailing_content(self):
@@ -600,7 +648,10 @@ class FixedDocumentTests(unittest.TestCase):
         self.assertTrue(check.validate(broken, CONTRACT))
         broken_contract = '````document-template\n# 固定文档\n\n## 说明\n```text\n原文\n````'
         self.assertTrue(check.check_template(broken_contract))
-        nested = GOOD + '\n````text\n```python\n# 原始内容\n```\n````\n'
+        outside = GOOD + '\n````text\n```python\n# 原始内容\n```\n````\n'
+        self.assertTrue(check.validate(outside, CONTRACT))
+        nested = GOOD.replace('- 证据：模拟 fixture 的入口未调用授权检查。',
+                              '- 证据：模拟 fixture 的入口未调用授权检查。\n  ````text\n  ```python\n  # 原始内容\n  ```\n  ````')
         self.assertEqual([], check.validate(nested, CONTRACT))
 
     def test_design_fields_cannot_be_dropped_as_writing_instructions(self):
