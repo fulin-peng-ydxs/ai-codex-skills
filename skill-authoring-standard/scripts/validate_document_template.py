@@ -20,6 +20,7 @@ REPEAT = re.compile(r'\s*<!-- repeat(?P<required>-required)? -->\s*$')
 FIELD = re.compile(r'^(?:- )?([^\n：:]+[：:])(.*)$')
 UNFINISHED = re.compile(r'\{\{@|\b(?:TODO|TBD)\s*:', re.I)
 ABSENT = re.compile(r'^(?:- )?(?:条目情况|适用性)：(?:无|不适用)[：:，； ]+\S[^\n]*$', re.M)
+VERBATIM = 'text verbatim'
 
 
 @dataclass
@@ -30,6 +31,60 @@ class Node:
     required: bool = False
     body: list[str] = field(default_factory=list)
     children: list['Node'] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class CodeFence:
+    start: int
+    end: int
+    info: str
+    content: str
+
+
+def code_fences(lines: list[str]) -> list[CodeFence]:
+    """Group the shared lexer's fence spans; matching rules stay in that lexer."""
+    result = []
+    opening = None
+    for index, (line, kind) in enumerate(fenced_lines('\n'.join(lines))):
+        if kind != 'marker':
+            continue
+        if opening is None:
+            info = re.match(r'^\s*(?:`+|~+)(.*)$', line)[1].strip()
+            opening = (index, info)
+        else:
+            start, info = opening
+            result.append(CodeFence(start, index + 1, info, '\n'.join(lines[start + 1:index])))
+            opening = None
+    if opening is not None:
+        start, info = opening
+        result.append(CodeFence(start, len(lines), info, '\n'.join(lines[start + 1:])))
+    return result
+
+
+def check_code(expected: Node, actual: Node, where: str) -> list[str]:
+    expected_blocks = code_fences(expected.body)
+    actual_blocks = code_fences(actual.body)
+    errors = []
+    matching_count = len(expected_blocks) == len(actual_blocks)
+    if expected_blocks and not matching_count:
+        errors.append(f'{where}: declared code block count differs from template')
+    literal_lines = set()
+    for index, block in enumerate(actual_blocks):
+        if 'verbatim' in block.info.split():
+            errors.append(f'{where}: document contains a template-only verbatim marker')
+        declared = expected_blocks[index] if matching_count and index < len(expected_blocks) else None
+        if declared and not block.content.strip():
+            errors.append(f'{where}: declared code block is empty')
+        if declared and declared.info == VERBATIM:
+            if block.content.strip() == declared.content.strip():
+                errors.append(f'{where}: verbatim source slot is still unfilled')
+            literal_lines.update(range(block.start, block.end))
+    checked = '\n'.join(line for index, line in enumerate(actual.body) if index not in literal_lines)
+    if '{{@' in checked or '<!-- repeat' in checked:
+        errors.append(f'{where}: body contains unfilled placeholders or template markers')
+    if any('document-template' in line for line in checked.splitlines() if line.startswith(('```', '~~~'))):
+        errors.append(f'{where}: document contains a template wrapper')
+    return errors
 
 
 def template_blocks(text: str) -> dict[str, str]:
@@ -93,7 +148,7 @@ def table_headers(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def check_body(expected: Node, actual: Node, where: str) -> list[str]:
-    errors = []
+    errors = check_code(expected, actual, where)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
     actual_lines = prose_without_fences('\n'.join(actual.body)).splitlines()
     fields = []
@@ -143,6 +198,9 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
 
 def check_node(expected: Node, actual: Node, where: str = 'document') -> list[str]:
     errors = check_body(expected, actual, where)
+    titles = [child.title for child in actual.children]
+    if len(titles) != len(set(titles)):
+        errors.append(f'{where}: duplicate sibling headings')
     position = 0
     for child in expected.children:
         count = 0
@@ -181,11 +239,22 @@ def check_template(text: str) -> list[str]:
     for name, skeleton in blocks.items():
         if not fences_closed(skeleton):
             errors.append(f'{name}: template contains an unclosed code fence')
+        if '{{@' in PLACEHOLDER.sub('', skeleton):
+            errors.append(f'{name}: template contains a malformed placeholder')
         root = parse_tree(skeleton, True)
         if not root.children:
             errors.append(f'{name}: template has no headings')
         def walk(node):
+            patterns = set()
+            for block in code_fences(node.body):
+                if 'verbatim' in block.info.split() and (
+                        block.info != VERBATIM or not PLACEHOLDER.fullmatch(block.content.strip())):
+                    errors.append(f'{name}: verbatim fence must contain exactly one source placeholder')
             for child in node.children:
+                pattern = PLACEHOLDER.sub('{{@}}', child.title)
+                if pattern in patterns:
+                    errors.append(f'{name}: duplicate sibling heading pattern {child.title}')
+                patterns.add(pattern)
                 if child.level != node.level + 1:
                     errors.append(f'{name}: skipped heading level at {child.title}')
                 if child.repeat and not PLACEHOLDER.search(child.title):
@@ -211,10 +280,8 @@ def validate(text: str, template_text: str, block: str = 'document') -> list[str
         if not fences_closed(text):
             errors.append('document contains an unclosed code fence')
         prose = prose_without_fences(text)
-        if UNFINISHED.search(prose) or '<!-- repeat' in text:
+        if UNFINISHED.search(prose) or '<!-- repeat' in prose:
             errors.append('document contains unfilled placeholders or template markers')
-        if any('document-template' in line for line in text.splitlines() if line.startswith(('```', '~~~'))):
-            errors.append('document contains a template wrapper')
         return errors
     except ValueError as exc:
         return [str(exc)]

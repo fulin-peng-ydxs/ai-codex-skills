@@ -42,7 +42,7 @@ description: 创建或重构用户自有技能、统一技能名称时，设计�
 
 **模板与检查入口**
 
-本技能的 `scripts/validate_document_template.py` 复用 `ai-constraint-doc-authoring/scripts/document_markdown.py`，从权威资源的 `document-template` 代码块读取结构。块的语法、支持范围与精确命令见 [检查器用法](references/template-validation.md)，不另建 schema 或格式注册表。跨技能使用时须同级安装上述两个依赖，缺失明确报错。
+模板和命名检查器复用 `ai-constraint-doc-authoring/scripts/document_markdown.py`；前者从权威资源的 `document-template` 代码块读取结构，后者从命名规范读取词表。模板语法、支持范围与精确命令见 [检查器用法](references/template-validation.md)，不另建 schema 或格式注册表。跨技能使用时须同级安装本技能及上述解析器依赖，缺失明确报错。
 
 **通用文档规范的引用位置**
 

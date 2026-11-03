@@ -31,7 +31,7 @@
 | --- | --- | --- | --- |
 | `development-workflow` | 自动承接开发或计划请求，组织可执行、可验证的任务。 | 默认普通模式直接承接自然语言，不强制 PRD；涉及页面时询问 HTML/结构图原型选择。专业模式要求正式需求文档及适用页面原型。 | 按意图自动调用，开发已获授权时按计划继续，只要计划则不开发；自动调用不额外生成计划文件，范围、覆盖、进度及两种模式的验证要求由技能维护。 |
 | `requirement-closure-design` | 把粗需求补全为可落地的业务闭环。 | 分析角色、入口、操作、状态、权限、异常与范围，明确建议状态及未决事项。 | 默认先对话分析，要求保存或确认闭环可落地时保存当前成果；保留内容与确认状态，不自动转正式需求。 |
-| `requirement-doc-authoring` | 生成可追溯、可验收的正式需求文档。 | 明确请求 PRD 或需求文档时，继承上游、核实项目事实，形成稳定编号、业务与页面契约、适用的非功能目标和验收。 | 章节按风险展开，保存草案不等于确认；内部实现归计划，原型交给独立技能，复用已有有效成果。 |
+| `requirement-doc-authoring` | 生成可追溯、可验收的正式需求文档。 | 明确请求 PRD 或需求文档时，继承上游、核实项目事实，形成稳定编号、业务与页面契约、适用的非功能目标和验收。 | 产物格式与保存边界见技能入口；保存草案不等于确认；内部实现归计划，原型交给独立技能，复用已有有效成果。 |
 | `frontend-prototype-design` | 制作 HTML 交互原型或结构图原型。 | 独立或承接需求/计划，形式未明确时询问选择；HTML 模拟交互，结构图提供页面线框和操作/状态说明，按形式验证。 | 默认在本次功能目录使用 `prototypes/{page-slug}.html` 或 `.md`；不要求先有 PRD，继承已有选择，不自动修改生产页面。 |
 
 ### 项目文档与架构治理
@@ -39,7 +39,7 @@
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `ai-constraint-doc-authoring` | 生成项目级 AI 协作规则和 Claude 薄入口。 | 按适用最低内容和项目结构生成或重构项目级 `AGENTS.md` 与 `CLAUDE.md`，按授权选择单文件或双文件交付与校验；基于仓库事实和实际命令验证落地，入口能引导后续 Agent 定位适用事实源。 | 统一维护命令发现、验证及权威文档，供 README 技能复用；验证范围按本次维护对象确定，专项事实与约束由调用方提供；入口保留 AI 约束，面向人的操作细节归 README 或专门指南，不反向依赖 README 生成。 |
-| `skill-authoring-standard` | 统一用户自有技能的命名、编写和整体重构方式。 | 按统一一级领域、必要细分对象与任务能力命名，组织职责、输入、流程、约束、产出和验证，复用系统技能创建与基础校验能力。 | 创建或重命名先读命名规范并运行命名检查；结构可裁剪，重构须对照原核心契约并推演关键分支，格式通过不等于语义保留。 |
+| `skill-authoring-standard` | 统一用户自有技能的命名、编写和整体重构方式。 | 按统一一级领域、必要细分对象与任务能力命名，组织职责、输入、流程、约束、产出和验证，复用系统技能创建与基础校验能力。 | 创建或重命名先读命名规范并运行命名检查；结构要求见技能入口，重构须对照原核心契约并推演关键分支，格式通过不等于语义保留。 |
 | `ai-instruction-refactoring` | 为 AI 规则和提示词去重、压缩并明确边界。 | 精简、重构和规范 AI 约束文档、`DESIGN.md`、技能说明、自动化规则与提示词规范，保留最新事实和稳定执行约束；同时保留目标读者理解和执行所需的说明。 | 合并相近规则但不删除面向开发者、运维或业务读者的必要操作步骤；README 和操作指南须保留主要路径。 |
 | `project-module-architecture-doc-authoring` | 基于系统代码生成专一技术主题说明。 | 支持功能模块、平台子系统、系统架构、部署架构和特定技术解析，解释组成、机制、依赖、接入与变更影响。 | 技术机制在所属专题维护；逐环节业务明细引用闭环文档，具体环境操作归运维手册，整体交付评估归接手报告。 |
 | `project-handover-analysis` | 评估项目或多仓交付包的接手条件。 | 生成指定版本的完整性、风险与接手路径快照，保留系统全景、关键模块及最小接手链路。 | 引用已有技术专题和业务闭环事实，不复制长期手册；缺失须有预期证据，静态确认与实际运行分开。 |
@@ -126,7 +126,7 @@
 | 需求闭环、正式需求与开发计划 | `requirement-closure-design`、`requirement-doc-authoring`、`development-workflow` | [需求协作共用契约](requirement-doc-authoring/references/workflow-contract.md)及各阶段唯一模板 |
 | 页面原型 | `frontend-prototype-design` | [原型入口](frontend-prototype-design/SKILL.md)及其引用的结构图模板、HTML 交互契约 |
 | 项目协作与技术事实文档 | `ai-constraint-doc-authoring`、`project-readme-authoring`、`project-module-architecture-doc-authoring`、`business-closed-loop-analysis`、`design-spec-authoring` | 各所属技能引用的唯一产物模板 |
-| 分析与审核报告 | `backend-memory-risk-analysis`、`business-feature-audit`、`design-compliance-audit`、`frontend-ux-audit`、`system-disk-usage-analysis`、`system-process-usage-analysis` | 各所属技能的报告模板；分析方法及判断规则由其声明的入口维护 |
+| 分析与审核报告 | `code-review`、`backend-memory-risk-analysis`、`business-feature-audit`、`design-compliance-audit`、`frontend-ux-audit`、`system-disk-usage-analysis`、`system-process-usage-analysis` | 各所属技能的报告模板；分析方法及判断规则由其声明的入口维护 |
 | 前端设计方案与复用反馈 | `frontend-design`、`frontend-reuse-governance` | [设计方案入口](frontend-design/SKILL.md)及[复用治理入口](frontend-reuse-governance/SKILL.md) |
 | 项目接手评估 | `project-handover-analysis` | [接手报告模板](project-handover-analysis/assets/project-handover-report-template.md) |
 | 运维方案、汇报、记录与手册 | `operation-workflow` | [运维流程](operation-workflow/SKILL.md)及[各类文档模板](operation-workflow/references/output-templates.md) |

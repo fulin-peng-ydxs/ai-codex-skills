@@ -57,6 +57,7 @@ def filled(skeleton):
     """Create syntax fixtures only, never represent these as verified project reports."""
     out = skeleton
     out = re.sub(r' <!-- repeat(?:-required)? -->', '', out)
+    out = re.sub(r'^(`{3,}|~{3,})text verbatim$', r'\1text', out, flags=re.M)
     out = check.PLACEHOLDER.sub('样例1', out)
     lines = out.splitlines()
     # Templates may declare a table with header only; add a nonempty test record.
@@ -67,6 +68,73 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_duplicate_template_and_document_headings_are_rejected(self):
+        duplicate = '```document-template\n# 报告\n\n## 结论\n第一项。\n\n## 结论\n第二项。\n```'
+        self.assertTrue(check.check_template(duplicate))
+        self.assertTrue(check.validate('# 报告\n\n## 结论\n第一项。\n\n## 结论\n第二项。\n', duplicate))
+        dynamic = '```document-template\n# 报告\n\n## {{@甲}}\n内容。\n\n## {{@乙}}\n内容。\n```'
+        self.assertTrue(check.check_template(dynamic))
+        separate = '```document-template\n# 报告\n\n## 甲\n### 结论\n内容。\n\n## 乙\n### 结论\n内容。\n```'
+        self.assertEqual([], check.validate(filled(check.template_blocks(separate)['document']), separate))
+
+    def test_code_slots_require_content_and_reject_reserved_placeholders(self):
+        source = '````document-template\n# 命令记录\n\n## 内容\n- 范围：{{@对象}}\n```sh\n{{@待填命令}}\n```\n````'
+        good = '# 命令记录\n\n## 内容\n- 范围：隔离样例。\n```sh\n# TODO: legitimate source comment\necho "{id}"\n```\n'
+        self.assertEqual([], check.validate(good, source))
+        for command in ['{{@待填命令}}', '{{@未闭合', '', '<!-- repeat -->']:
+            with self.subTest(command=command):
+                bad = good.replace('# TODO: legitimate source comment\necho "{id}"', command)
+                self.assertTrue(check.validate(bad, source))
+        missing = good[:good.index('```sh')]
+        self.assertTrue(check.validate(missing, source))
+
+    def test_verbatim_scope_comes_from_the_template_and_retains_real_source(self):
+        source = '````document-template\n# 原文记录\n- 来源：{{@实际来源}}\n\n```text verbatim\n{{@用户原文}}\n```\n````'
+        raw = '原文中的 {{@占位示例}}\n<!-- repeat -->\n```document-template\n# 示例\n```\nTODO: 原始待办'
+        good = '# 原文记录\n- 来源：隔离样例原文。\n\n````text\n' + raw + '\n````\n'
+        self.assertEqual([], check.validate(good, source))
+        for content in ['{{@用户原文}}', '']:
+            bad = '# 原文记录\n- 来源：隔离样例。\n\n```text\n' + content + '\n```\n'
+            self.assertTrue(check.validate(bad, source))
+        self.assertTrue(check.validate(good.replace('````text\n', '````text verbatim\n'), source))
+        self.assertTrue(check.validate(good + '\n```text\n额外块\n```\n', source))
+        normal = source.replace('text verbatim', 'text')
+        self.assertTrue(check.validate(good, normal))
+        self.assertTrue(check.validate(good.replace('````text\n', '````text verbatim\n'), normal))
+
+    def test_plan_consumes_reuse_analysis_in_its_own_fields(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        good = good.replace('- 实施方案：样例1', '- 实施方案：复用已有筛选入口；隔离样例定位为 existing/filter.ts。\n  候选筛选状态：已比较旧、新页面的共同变化点；保留各自的数据请求。')
+        good = good.replace('- 影响与保持项：样例1', '- 影响与保持项：旧、新消费者共同接入，迁移步骤纳入当前任务；保留提交行为。')
+        good = good.replace('- 完成条件：样例1', '- 完成条件：验证两处消费者及项目要求的登记维护。')
+        self.assertEqual([], check.validate(good, source))
+        snippet = '### 共用筛选状态\n- 现状与依据：已比较两处。\n- 判断与边界：复用已有入口。\n- 消费方与处理：迁移两处。\n- 验证与维护：安排回归。\n\n'
+        self.assertTrue(check.validate(good.replace('## 3. 验收与交付', snippet + '## 3. 验收与交付'), source))
+
+    def test_operation_record_keeps_all_three_literal_sources(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        skeleton = check.template_blocks(source)['record']
+        skeleton = skeleton.replace('```text verbatim', '`````text')
+        skeleton = re.sub(r'^```$', '`````', skeleton, flags=re.M)
+        raw = ['用户输入中的 {{@示例}}\n```document-template\n# 示例\n```',
+               '批准原文\n<!-- repeat -->\nTODO: 原始待办',
+               '汇报原文\n## 内部标题\n{{@尚未完成的示例}}']
+        values = iter(['隔离需求来源及哈希', raw[0], '隔离批准来源及哈希', raw[1], '隔离汇报来源及哈希', raw[2]])
+        document = check.PLACEHOLDER.sub(lambda _: next(values), skeleton)
+        self.assertEqual([], check.validate(document, source, 'record'))
+        for text in raw:
+            self.assertIn(text, document)
+        self.assertNotIn('text verbatim', document)
+
+    def test_formal_code_review_reports_have_an_authoritative_contract(self):
+        source = (ROOT / 'code-review/references/report-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        self.assertTrue(check.validate(good.replace('- 用途与归属：样例1\n', ''), source))
+        no_issues = good[:good.index('### Q')] + '条目情况：无：已核对本次隔离样例的指定范围。\n\n' + good[good.index('## 3.') :]
+        self.assertEqual([], check.validate(no_issues, source))
+
     def test_valid_report_and_multiple_entries(self):
         self.assertEqual([], check.validate(GOOD, CONTRACT))
         more = GOOD.replace('## 验证覆盖', '### Q2：历史数据范围\n- 证据：另一个模拟入口。\n- 影响：仅影响历史数据。\n- 验证：未验证：历史数据不可访问。\n\n## 验证覆盖')
