@@ -69,6 +69,22 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_operation_templates_reserve_recovery_and_listening_facts(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        blocks = check.template_blocks(source)
+        unit = filled(blocks['unit'])
+        recovery = '- 备份与恢复现状：样例1'
+        # Unknown recovery stays explicit and may use a field-owned table.
+        detailed = unit.replace(recovery, '- 备份与恢复现状：\n\n'
+                                '  | 对象 | 证据与缺口 |\n  | --- | --- |\n'
+                                '  | 测试数据 | 未核实：备份责任人及演练未知 |\n')
+        self.assertEqual([], check.validate(detailed, source, 'unit'))
+        self.assertTrue(check.validate(unit.replace(recovery, ''), source, 'unit'))
+        index = filled(blocks['index'])
+        self.assertEqual([], check.validate(index, source, 'index'))
+        self.assertTrue(check.validate(index.replace('- 监听与访问边界：样例1', ''), source, 'index'))
+        self.assertTrue(check.validate(index.replace('版本 / 基础状态', '实时业务健康'), source, 'index'))
+
     def test_owned_code_fences_use_field_relative_indentation(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         good = filled(check.template_blocks(source)['unit'])
