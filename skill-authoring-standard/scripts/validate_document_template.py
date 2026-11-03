@@ -12,7 +12,7 @@ _parser_dir = Path(__file__).resolve().parents[2] / 'ai-constraint-doc-authoring
 if not (_parser_dir / 'document_markdown.py').is_file():
     raise SystemExit('Missing dependency: install ai-constraint-doc-authoring beside this skill.')
 sys.path.insert(0, str(_parser_dir))
-from document_markdown import fenced_lines, has_content, prose_without_fences, table_cells
+from document_markdown import fenced_lines, fences_closed, has_content, prose_without_fences, table_cells
 
 PLACEHOLDER = re.compile(r'\{\{@[^{}\n]+\}\}')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
@@ -176,6 +176,8 @@ def check_template(text: str) -> list[str]:
     except ValueError as exc:
         return [str(exc)]
     for name, skeleton in blocks.items():
+        if not fences_closed(skeleton):
+            errors.append(f'{name}: template contains an unclosed code fence')
         root = parse_tree(skeleton, True)
         if not root.children:
             errors.append(f'{name}: template has no headings')
@@ -203,6 +205,8 @@ def validate(text: str, template_text: str, block: str = 'document') -> list[str
         expected = parse_tree(blocks[block], True)
         actual = parse_tree(text)
         errors = check_node(expected, actual)
+        if not fences_closed(text):
+            errors.append('document contains an unclosed code fence')
         prose = prose_without_fences(text)
         if UNFINISHED.search(prose) or '<!-- repeat' in text:
             errors.append('document contains unfilled placeholders or template markers')

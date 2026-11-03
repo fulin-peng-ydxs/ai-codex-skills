@@ -105,6 +105,49 @@ class FixedDocumentTests(unittest.TestCase):
         text = GOOD.replace('## 验证覆盖', '```python\n# implementation note\n## not a document heading\n```\n\n## 验证覆盖')
         self.assertEqual([], check.validate(text, CONTRACT))
 
+    def test_unclosed_code_fences_cannot_hide_trailing_content(self):
+        broken = GOOD + '\n```python\nprint(1)\n## 意外章节\n{{@未填写}}\n'
+        self.assertTrue(check.validate(broken, CONTRACT))
+        broken_contract = '````document-template\n# 固定文档\n\n## 说明\n```text\n原文\n````'
+        self.assertTrue(check.check_template(broken_contract))
+        nested = GOOD + '\n````text\n```python\n# 原始内容\n```\n````\n'
+        self.assertEqual([], check.validate(nested, CONTRACT))
+
+    def test_design_fields_cannot_be_dropped_as_writing_instructions(self):
+        source = (ROOT / 'design-spec-authoring/references/design-md-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        for label in ['数据区', '列与长内容', '操作区', '承载容器', '桌面降级',
+                      '适用任务与边界', '接入与默认呈现', '使用与禁用', '交互承接',
+                      '布局与视口差异', '依据与状态']:
+            with self.subTest(field=label):
+                missing = re.sub(r'^- ' + re.escape(label) + r'：.*\n', '', good, flags=re.M)
+                self.assertTrue(check.validate(missing, source))
+
+    def test_handover_preparation_steps_keep_their_labels(self):
+        source = (ROOT / 'project-handover-analysis/assets/project-handover-report-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        missing = re.sub(r'^1\. .*\n', '', good, count=1, flags=re.M)
+        self.assertTrue(check.validate(missing, source))
+
+    def test_business_permission_matrix_has_a_fixed_home(self):
+        source = (ROOT / 'business-closed-loop-analysis/references/output-contract.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        header = '| 角色/身份 | 入口/资源 | 允许操作 | 数据范围 | 判定位置 | 业务表约束 | 缺口 |'
+        missing = re.sub(re.escape(header) + r'\n\|[^\n]+\n(?:\|[^\n]+\n)*', '', good)
+        self.assertTrue(check.validate(missing, source))
+
+    def test_memory_report_retains_date_status_and_generation_time(self):
+        source = (ROOT / 'backend-memory-risk-analysis/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        for label in ['报告日期', '生成时点', '报告状态']:
+            with self.subTest(field=label):
+                missing = re.sub(r'^- ' + label + r'：.*\n', '', good, flags=re.M)
+                self.assertTrue(check.validate(missing, source))
+
     def test_business_braces_are_not_template_placeholders(self):
         for value in ['`GET /records/{id}`', 'GET /records/{id}', '`{colors.primary}`',
                       '{colors.primary}', '{"status": "ok"}', '{{user.name}}', '{具体来源}']:

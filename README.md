@@ -119,18 +119,19 @@
 
 ## 文档输出规则入口
 
-通用结构与裁剪见 [文档输出规范](~/ai-agent-config/config/force/document-output.md)，权威归属与边界说明见 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。下表只用于选入口，各类产物的具体要求由所指资源维护；技能设计如何接入这些规范见 [技能编写规范](skill-authoring-standard/SKILL.md#核心约束)。
+通用规则见 [文档输出规范](~/ai-agent-config/config/force/document-output.md)，权威归属见 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。下表只按产物用途选择入口，不另定义结构策略、目录或字段。规范接入方式由 [技能编写规范](skill-authoring-standard/SKILL.md#核心约束) 维护，机器检查用法见 [模板检查器](skill-authoring-standard/references/template-validation.md)。
 
-| 结构或处理方式 | 技能范围 | 具体契约位置 |
+| 产物或任务 | 技能范围 | 权威入口 |
 | --- | --- | --- |
-| 默认骨架，继承阶段信息粒度 | `requirement-closure-design`、`requirement-doc-authoring`、`development-workflow` | [共用契约](requirement-doc-authoring/references/workflow-contract.md)及各阶段条目模板 |
-| 按原型形式承载 | `frontend-prototype-design` | [原型技能](frontend-prototype-design/SKILL.md)：结构图用默认骨架，HTML 用页面和交互契约 |
-| 参考结构，最低内容必需 | `ai-constraint-doc-authoring`、`project-readme-authoring`、`project-module-architecture-doc-authoring`、`business-closed-loop-analysis`、`design-spec-authoring` | 各技能的输出契约或结构参考；结构校验与内容核对分开 |
-| 默认报告骨架，保留逐项证据与状态 | `backend-memory-risk-analysis`、`business-feature-audit`、`design-compliance-audit`、`frontend-ux-audit` | 各技能的报告模板与输出要求 |
-| 参考结构，按请求范围输出 | `system-disk-usage-analysis`、`system-process-usage-analysis`、`code-review`、`frontend-reuse-governance`、`frontend-design` | 各技能的报告、反馈或方案要求；不自动落盘 |
-| 默认骨架，按判断与接手动作整合 | `project-handover-analysis` | [接手报告模板与内容要求](project-handover-analysis/assets/project-handover-report-template.md)，用户指定摘要或专项范围时按其要求 |
-| 维护或委派文档，沿用原契约 | `ai-instruction-refactoring`、`automation-management`、`config-codex-sync` | 精简保留核心要求；自动化引用业务技能；同步仅适配目标路径 |
-| 专用产物，不套通用报告 | `git-commit-message-authoring`、`git-push`、`config-project-mcp-sync` | 提交消息由 `git-commit-message-authoring` 的 A/B 契约维护；MCP 保留配置字段、协议及结果分类 |
+| 需求闭环、正式需求与开发计划 | `requirement-closure-design`、`requirement-doc-authoring`、`development-workflow` | [需求协作共用契约](requirement-doc-authoring/references/workflow-contract.md)及各阶段唯一模板 |
+| 页面原型 | `frontend-prototype-design` | [原型入口](frontend-prototype-design/SKILL.md)及其引用的结构图模板、HTML 交互契约 |
+| 项目协作与技术事实文档 | `ai-constraint-doc-authoring`、`project-readme-authoring`、`project-module-architecture-doc-authoring`、`business-closed-loop-analysis`、`design-spec-authoring` | 各所属技能引用的唯一产物模板 |
+| 分析与审核报告 | `backend-memory-risk-analysis`、`business-feature-audit`、`design-compliance-audit`、`frontend-ux-audit`、`system-disk-usage-analysis`、`system-process-usage-analysis` | 各所属技能的报告模板；分析方法及判断规则由其声明的入口维护 |
+| 前端设计方案与复用反馈 | `frontend-design`、`frontend-reuse-governance` | [设计方案入口](frontend-design/SKILL.md)及[复用治理入口](frontend-reuse-governance/SKILL.md) |
+| 项目接手评估 | `project-handover-analysis` | [接手报告模板](project-handover-analysis/assets/project-handover-report-template.md) |
+| 运维方案、汇报、记录与手册 | `operation-workflow` | [运维流程](operation-workflow/SKILL.md)及[各类文档模板](operation-workflow/references/output-templates.md) |
+| 文档维护、委派与对话审查 | `ai-instruction-refactoring`、`automation-management`、`config-codex-sync`、`code-review` | 各技能入口及目标文档的既有契约 |
+| 提交消息与机器配置 | `git-commit-message-authoring`、`git-push`、`config-project-mcp-sync` | 提交消息 A/B 契约及 MCP 的配置字段、协议与结果分类 |
 
 `.system/` 下的系统技能按各自入口维护契约：[skill-creator](.system/skill-creator/SKILL.md) 创建和更新技能，[review-agent](.system/review-agent/SKILL.md) 执行受委派的只读代码审查，[openai-docs](.system/openai-docs/SKILL.md) 提供 OpenAI 产品、API 与 Codex 文档指引，[imagegen](.system/imagegen/SKILL.md) 生成或编辑图像，[skill-installer](.system/skill-installer/SKILL.md) 安装技能。本 README 不另行定义这些技能的产物结构。
 
@@ -144,5 +145,3 @@
 ## 备注
 
 - “当前技能”列表介绍 `~/.codex/skills/` 下的用户自定义技能；`.system/` 仅在输出规则入口说明相关契约，不列为用户自定义技能。
-
-文档生成的通用固定规则维护在 [全局输出规范](~/ai-agent-config/config/force/document-output.md)；创建技能及其模板的流程见 [技能编写规范](skill-authoring-standard/SKILL.md)，产物格式及内容要求由各技能的唯一模板维护。[模板检查器用法](skill-authoring-standard/references/template-validation.md) 提供共用验证入口，不另维护目录或字段清单。

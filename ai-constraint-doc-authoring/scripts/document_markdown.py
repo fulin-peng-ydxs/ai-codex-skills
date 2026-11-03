@@ -44,6 +44,11 @@ def fenced_lines(text: str):
             yield line, "prose"
 
 
+def fences_closed(text: str) -> bool:
+    """Require explicit closing fences, using the same matching rules as parsing."""
+    return sum(kind == "marker" for _, kind in fenced_lines(text)) % 2 == 0
+
+
 def parse_sections(text: str) -> tuple[list[str], list[tuple[str, str]]]:
     h1: list[str] = []
     sections: list[tuple[str, list[str]]] = []

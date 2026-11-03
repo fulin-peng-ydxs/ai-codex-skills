@@ -1,6 +1,6 @@
 # 工作空间、初始化与手册
 
-本文定义布局、首次接入和事实文档；授权执行只走 [主流程](../SKILL.md)。产物遵守 [文档输出](~/ai-agent-config/config/force/document-output.md) 与 [文档边界](~/ai-agent-config/config/force/document-boundaries.md)。各Markdown产物的格式及字段唯一由 [固定模板](output-templates.md) 维护；局部更新保留范围外正文和事实粒度。
+本文定义布局、首次接入和事实文档；授权执行只走 [主流程](../SKILL.md)。Markdown 产物的格式、字段及通用规范入口统一由 [固定模板](output-templates.md) 维护；局部更新保留范围外正文和事实粒度。
 
 ## 初始化
 

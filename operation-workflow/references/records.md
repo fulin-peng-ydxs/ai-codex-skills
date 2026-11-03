@@ -1,6 +1,6 @@
 # 方案、执行记录与归档
 
-本文定义任务留痕与文件纳管；目录见 [工作空间](workspace.md)，授权执行见 [主流程](../SKILL.md)。记录是历史证据，不授予后续权限。产物遵守 [文档输出](~/ai-agent-config/config/force/document-output.md) 与 [文档边界](~/ai-agent-config/config/force/document-boundaries.md)。
+本文定义任务留痕与文件纳管；目录见 [工作空间](workspace.md)，授权执行见 [主流程](../SKILL.md)。记录是历史证据，不授予后续权限。Markdown 产物的通用规范统一从 [固定模板](output-templates.md) 接入。
 
 ## 本次记录
 
