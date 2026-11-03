@@ -98,3 +98,5 @@ description: 分析一个项目的后端，尤其是 Java/Spring 服务中可能
 ## 验证与完成标准
 
 逐项核对长期持有对象、增长原因、触发条件、代码证据、影响、建议和处理状态；回查上一份报告，区分新增风险与状态变化。没有运行时证据不得声明泄漏已证实，未发现明显风险仍说明盲区。
+
+首次完整报告或整体重构后运行 `python3 <skills-root>/skill-authoring-standard/scripts/validate_document_template.py <产物路径> --template <本技能目录>/references/output-template.md`；字段内容按同一模板核对，保存和局部更新不借格式检查重排全文。

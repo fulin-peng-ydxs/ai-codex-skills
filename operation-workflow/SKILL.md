@@ -44,3 +44,5 @@ description: 初始化运维工作空间、接入服务器、盘点服务，按�
 交付实际结果、记录路径、必要手册/镜像和 commit ID；分别说明服务器结果、人工确认、归档和 Git 状态。失败/取消保留证据，未完成审批或提交不称完整闭环；未做业务检查不称业务验收通过。
 
 交付前核对需求、获批版本、实际动作、验证和提交内容对应。归档须通过 `python3 <技能目录>/scripts/check_archive.py index --repo <仓库根> --operations-root <仓库相对运维目录>`；它仅检查索引路径、类型和大小，不能替代敏感信息、授权或远端结果核实。
+
+新建或整体重构Markdown运维产物前读取 [固定产物模板](references/output-templates.md)，按实际交付块填充；完成后运行 `python3 <skills-root>/skill-authoring-standard/scripts/validate_document_template.py <产物路径> --template <本技能目录>/references/output-templates.md --block <实际产物块>`。原文保存和局部更新保留基线；既有授权、命令策略及归档门禁继续执行。

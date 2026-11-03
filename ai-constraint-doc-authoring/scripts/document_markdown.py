@@ -5,6 +5,26 @@ from __future__ import annotations
 import re
 
 
+def table_cells(line: str) -> list[str]:
+    """Split Markdown table cells, preserving escaped pipes in values."""
+    cells = []
+    current = []
+    escaped = False
+    for character in line.strip():
+        if character == '|' and not escaped:
+            cells.append(''.join(current).strip())
+            current = []
+        else:
+            current.append(character)
+        escaped = character == '\\' and not escaped
+    cells.append(''.join(current).strip())
+    if cells and not cells[0]:
+        cells.pop(0)
+    if cells and not cells[-1]:
+        cells.pop()
+    return cells
+
+
 def fenced_lines(text: str):
     """Classify lines using matching fence characters and opening fence length."""
     fence = ""

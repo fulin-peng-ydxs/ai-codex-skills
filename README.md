@@ -119,7 +119,7 @@
 
 ## 文档输出规则入口
 
-通用结构与裁剪见 [文档输出规范](~/ai-agent-config/config/force/document-output.md)，权威归属与边界说明见 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。下表只用于选入口，各类产物的具体要求由所指资源维护；技能设计如何接入这些规范见 [技能编写规范](skill-authoring-standard/SKILL.md#生成文档技能的设计要求)。
+通用结构与裁剪见 [文档输出规范](~/ai-agent-config/config/force/document-output.md)，权威归属与边界说明见 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。下表只用于选入口，各类产物的具体要求由所指资源维护；技能设计如何接入这些规范见 [技能编写规范](skill-authoring-standard/SKILL.md#核心约束)。
 
 | 结构或处理方式 | 技能范围 | 具体契约位置 |
 | --- | --- | --- |
@@ -144,3 +144,5 @@
 ## 备注
 
 - “当前技能”列表介绍 `~/.codex/skills/` 下的用户自定义技能；`.system/` 仅在输出规则入口说明相关契约，不列为用户自定义技能。
+
+文档生成的通用固定规则维护在 [全局输出规范](~/ai-agent-config/config/force/document-output.md)；创建技能及其模板的流程见 [技能编写规范](skill-authoring-standard/SKILL.md)，产物格式及内容要求由各技能的唯一模板维护。[模板检查器用法](skill-authoring-standard/references/template-validation.md) 提供共用验证入口，不另维护目录或字段清单。
