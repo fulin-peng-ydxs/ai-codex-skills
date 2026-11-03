@@ -68,6 +68,70 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_requirement_goal_absence_cannot_waive_missing_integration_acceptance(self):
+        source = (ROOT / 'requirement-doc-authoring/references/requirement-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        good = good.replace('- 适用性：样例1\n- 流程与交接：样例1',
+                            '- 适用性：存在跨需求流程，必须集成验收。\n- 流程与交接：审批完成后交接执行任务。')
+        start, end = good.index('## 3.'), good.index('## 4.')
+        lines = good[start:end].splitlines()
+        tables = [index for index, _ in check.table_headers(lines)]
+        self.assertEqual(2, len(tables))
+        target, acceptance = tables
+        lines[target + 2] = '条目情况：不适用：本次没有共用性能、安全目标。'
+        goal_absent = good[:start] + '\n'.join(lines) + '\n\n' + good[end:]
+        self.assertEqual([], check.validate(goal_absent, source))
+        # This is the reviewed failure: only the goal table has an absence reason.
+        missing = lines[:acceptance + 2] + lines[acceptance + 3:]
+        errors = check.validate(good[:start] + '\n'.join(missing) + '\n\n' + good[end:], source)
+        self.assertTrue(errors)
+        self.assertTrue(any('验收标识 / 关联差异' in error for error in errors))
+        lines[acceptance + 2] = '条目情况：不适用：独立场景没有跨需求流程或集成验收。'
+        both_absent = good[:start] + '\n'.join(lines) + '\n\n' + good[end:]
+        both_absent = both_absent.replace('存在跨需求流程，必须集成验收。', '不涉及跨需求流程或集成验收。')
+        self.assertEqual([], check.validate(both_absent, source))
+
+    def test_empty_tables_require_their_own_immediately_following_reason(self):
+        source = '''```document-template
+# 隔离空表样例
+| 目标 | 依据 |
+| --- | --- |
+| {{@目标}} | {{@实际依据}} |
+
+| 验收 | 条件 |
+| --- | --- |
+| {{@验收}} | {{@条件}} |
+```'''
+        first = '# 隔离空表样例\n| 目标 | 依据 |\n| --- | --- |\n'
+        second = '\n| 验收 | 条件 |\n| --- | --- |\n'
+        reason_a = '条目情况：不适用：隔离场景没有目标条目。\n'
+        reason_b = '条目情况：无：已核对隔离场景，没有验收对象。\n'
+        self.assertEqual([], check.validate(first + reason_a + second + reason_b, source))
+        self.assertEqual([], check.validate(first + '\n' + reason_a + second + '| A1 | 可观察结果 |\n', source))
+        for bad in [first + reason_a + second, first + second + reason_b,
+                    first + reason_a + second + '其他事项说明。\n' + reason_b,
+                    reason_a + first + second + reason_b,
+                    first + '- 适用性：不适用：另一个对象的判断。\n' + second + reason_b,
+                    first + '> ' + reason_a + second + reason_b,
+                    first + '```text\n无关代码内容\n```\n' + reason_a + second + reason_b]:
+            with self.subTest(document=bad):
+                self.assertTrue(check.validate(bad, source))
+
+    def test_table_absence_does_not_omit_a_separate_repeated_unit(self):
+        source = '''```document-template
+# 隔离空集合样例
+| 数据 | 依据 |
+| --- | --- |
+| {{@实际数据}} | {{@来源}} |
+
+## 对象：{{@名称}} <!-- repeat -->
+- 证据：{{@实际证据}}
+```'''
+        document = '# 隔离空集合样例\n| 数据 | 依据 |\n| --- | --- |\n条目情况：无：仅说明该表没有记录。\n'
+        self.assertTrue(check.validate(document, source))
+        standalone = document.replace('# 隔离空集合样例\n', '# 隔离空集合样例\n条目情况：无：已核对，没有额外对象。\n\n')
+        self.assertEqual([], check.validate(standalone, source))
+
     def test_fixed_table_dimensions_cannot_be_removed_duplicated_or_reordered(self):
         source = (ROOT / 'project-handover-analysis/assets/project-handover-report-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])

@@ -19,7 +19,9 @@ HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
 REPEAT = re.compile(r'\s*<!-- repeat(?P<required>-required)? -->\s*$')
 FIELD = re.compile(r'^(?:- )?([^\n：:]+[：:])(.*)$')
 UNFINISHED = re.compile(r'\{\{@|\b(?:TODO|TBD)\s*:', re.I)
-ABSENT = re.compile(r'^(?:- )?(?:条目情况|适用性)：(?:无|不适用)[：:，； ]+\S[^\n]*$', re.M)
+ABSENCE_VALUE = r'(?:无|不适用)[：:，； ]+\S[^\n]*'
+ABSENT = re.compile(r'^(?:- )?(?:条目情况|适用性)：' + ABSENCE_VALUE + r'$', re.M)
+TABLE_ABSENT = re.compile(r'^(?:- )?条目情况：' + ABSENCE_VALUE + r'$')
 VERBATIM = 'text verbatim'
 
 
@@ -163,6 +165,23 @@ def table_rows(lines: list[str], header_index: int) -> list[list[str]]:
     return rows
 
 
+def body_prose(lines: list[str]) -> list[str]:
+    """Hide code while retaining physical offsets for table-local reasons."""
+    return [line if kind == 'prose' else '' for line, kind in fenced_lines('\n'.join(lines))]
+
+
+def table_absences(body: list[str], prose: list[str]) -> dict[int, int]:
+    """Bind a reason only to the empty table immediately before it."""
+    bindings = {}
+    for index, _ in table_headers(prose):
+        if table_rows(prose, index):
+            continue
+        following = next((i for i in range(index + 2, len(body)) if body[i].strip()), None)
+        if following is not None and TABLE_ABSENT.fullmatch(body[following]):
+            bindings[index] = following
+    return bindings
+
+
 def rows_match(schema: list[list[str]], rows: list[list[str]]) -> bool:
     """Literal first cells identify fixed rows; variable first cells repeat in place."""
     if not schema:
@@ -190,7 +209,7 @@ def rows_match(schema: list[list[str]], rows: list[list[str]]) -> bool:
 def check_body(expected: Node, actual: Node, where: str) -> list[str]:
     errors = check_code(expected, actual, where)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
-    actual_lines = prose_without_fences('\n'.join(actual.body)).splitlines()
+    actual_lines = body_prose(actual.body)
     fields = []
     # Frontmatter belongs to the artifact's machine contract (e.g. skill-creator),
     # rather than the Markdown field namespace below its first heading.
@@ -217,6 +236,7 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
         errors.append(f'{where}: fields missing, duplicated or out of order; expected {fields}, found {observed_fields}')
     expected_tables = table_headers(expected_lines)
     actual_tables = table_headers(actual_lines)
+    absence_bindings = table_absences(actual.body, actual_lines)
     if [header for _, header in actual_tables] != [header for _, header in expected_tables]:
         errors.append(f'{where}: table columns or table order differ from template')
     for table_index, (index, header) in enumerate(actual_tables):
@@ -229,8 +249,8 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
             schema = table_rows(expected_lines, expected_tables[table_index][0])
             if not rows_match(schema, data):
                 errors.append(f'{where}: fixed table rows or row patterns are missing, duplicated, unexpected or out of order')
-        if not data and not ABSENT.search('\n'.join(actual_lines)):
-            errors.append(f'{where}: table has no records and no explicit absence reason')
+        if not data and index not in absence_bindings:
+            errors.append(f'{where}: table {header!r} has no records and no immediately following table-specific absence reason')
     if (fields or expected_tables or (not expected.children and has_content('\n'.join(expected.body)))) and not has_content('\n'.join(actual.body)):
         errors.append(f'{where}: empty body')
     return errors
@@ -238,6 +258,12 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
 
 def check_node(expected: Node, actual: Node, where: str = 'document') -> list[str]:
     errors = check_body(expected, actual, where)
+    standalone_absence = False
+    if any(child.repeat and not child.required for child in expected.children):
+        prose = body_prose(actual.body)
+        table_reasons = set(table_absences(actual.body, prose).values())
+        standalone_absence = bool(ABSENT.search('\n'.join(
+            line for index, line in enumerate(prose) if index not in table_reasons)))
     titles = [child.title for child in actual.children]
     if len(titles) != len(set(titles)):
         errors.append(f'{where}: duplicate sibling headings')
@@ -263,7 +289,7 @@ def check_node(expected: Node, actual: Node, where: str = 'document') -> list[st
         if not count:
             if not child.repeat or child.required:
                 errors.append(f'{where}: missing or out-of-order heading {child.title}')
-            elif not ABSENT.search('\n'.join(actual.body)):
+            elif not standalone_absence:
                 errors.append(f'{where}: omitted repeated entries require 条目情况：无/不适用 and a reason')
     for child in actual.children[position:]:
         errors.append(f'{where}: unexpected, duplicate or out-of-order heading {child.title}')
