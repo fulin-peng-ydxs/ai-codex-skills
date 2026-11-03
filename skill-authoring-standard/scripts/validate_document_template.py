@@ -17,8 +17,9 @@ from document_markdown import fenced_lines, fences_closed, has_content, prose_wi
 PLACEHOLDER = re.compile(r'\{\{@[^{}\n]+\}\}')
 HEADING = re.compile(r'^(#{1,6})\s+(.+?)\s*#*\s*$')
 REPEAT = re.compile(r'\s*<!-- repeat(?P<required>-required)? -->\s*$')
+FLEXIBLE = re.compile(r'\s*<!-- flexible-body -->\s*$')
 FIELD = re.compile(r'^(?:- )?([^\n：:]+[：:])(.*)$')
-UNFINISHED = re.compile(r'\{\{@|\b(?:TODO|TBD)\s*:', re.I)
+UNFINISHED = re.compile(r'\{\{@|\b(?:TODO|TBD)\s*:|<!-- flexible-body\b', re.I)
 ABSENCE_VALUE = r'(?:无|不适用)[：:，； ]+\S[^\n]*'
 ABSENT = re.compile(r'^(?:- )?(?:条目情况|适用性)：' + ABSENCE_VALUE + r'$', re.M)
 TABLE_ABSENT = re.compile(r'^(?:- )?条目情况：' + ABSENCE_VALUE + r'$')
@@ -31,6 +32,7 @@ class Node:
     level: int = 0
     repeat: bool = False
     required: bool = False
+    flexible: bool = False
     body: list[str] = field(default_factory=list)
     children: list['Node'] = field(default_factory=list)
 
@@ -82,7 +84,7 @@ def check_code(expected: Node, actual: Node, where: str) -> list[str]:
                 errors.append(f'{where}: verbatim source slot is still unfilled')
             literal_lines.update(range(block.start, block.end))
     checked = '\n'.join(line for index, line in enumerate(actual.body) if index not in literal_lines)
-    if '{{@' in checked or '<!-- repeat' in checked:
+    if '{{@' in checked or '<!-- repeat' in checked or '<!-- flexible-body' in checked:
         errors.append(f'{where}: body contains unfilled placeholders or template markers')
     pending = code_fences(checked.splitlines())
     while pending:
@@ -131,10 +133,13 @@ def parse_tree(text: str, template: bool = False) -> Node:
             stack[-1].body.append(line)
             continue
         title = match[2]
+        flexible = FLEXIBLE.search(title) if template else None
+        if flexible:
+            title = title[:flexible.start()]
         marker = REPEAT.search(title) if template else None
         if marker:
             title = title[:marker.start()]
-        node = Node(title, len(match[1]), bool(marker), bool(marker and marker['required']))
+        node = Node(title, len(match[1]), bool(marker), bool(marker and marker['required']), bool(flexible))
         while stack[-1].level >= node.level:
             stack.pop()
         stack[-1].children.append(node)
@@ -206,7 +211,7 @@ def rows_match(schema: list[list[str]], rows: list[list[str]]) -> bool:
     return len(rows) in positions
 
 
-def check_body(expected: Node, actual: Node, where: str) -> list[str]:
+def check_body(expected: Node, actual: Node, where: str, flexible: bool = False) -> list[str]:
     errors = check_code(expected, actual, where)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
     actual_lines = body_prose(actual.body)
@@ -237,7 +242,7 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
     expected_tables = table_headers(expected_lines)
     actual_tables = table_headers(actual_lines)
     absence_bindings = table_absences(actual.body, actual_lines)
-    if [header for _, header in actual_tables] != [header for _, header in expected_tables]:
+    if not flexible and [header for _, header in actual_tables] != [header for _, header in expected_tables]:
         errors.append(f'{where}: table columns or table order differ from template')
     for table_index, (index, header) in enumerate(actual_tables):
         column_count = len(table_cells(actual_lines[index]))
@@ -245,18 +250,35 @@ def check_body(expected: Node, actual: Node, where: str) -> list[str]:
         for cells in data:
             if len(cells) != column_count or any(not cell for cell in cells):
                 errors.append(f'{where}: table row has missing/empty columns')
-        if table_index < len(expected_tables):
+        if not flexible and table_index < len(expected_tables):
             schema = table_rows(expected_lines, expected_tables[table_index][0])
             if not rows_match(schema, data):
                 errors.append(f'{where}: fixed table rows or row patterns are missing, duplicated, unexpected or out of order')
         if not data and index not in absence_bindings:
             errors.append(f'{where}: table {header!r} has no records and no immediately following table-specific absence reason')
-    if (fields or expected_tables or (not expected.children and has_content('\n'.join(expected.body)))) and not has_content('\n'.join(actual.body)):
+    needs_body = ((flexible and not actual.children) or fields or expected_tables
+                  or (not expected.children and has_content('\n'.join(expected.body))))
+    if needs_body and not has_content('\n'.join(actual.body)):
         errors.append(f'{where}: empty body')
     return errors
 
 
+def check_flexible_node(actual: Node, where: str) -> list[str]:
+    """Allow local organization while keeping content and Markdown validity checks."""
+    errors = check_body(Node(), actual, where, flexible=True)
+    titles = [child.title for child in actual.children]
+    if len(titles) != len(set(titles)):
+        errors.append(f'{where}: duplicate sibling headings')
+    for child in actual.children:
+        if child.level != actual.level + 1:
+            errors.append(f'{where}: skipped heading level at {child.title}')
+        errors.extend(check_flexible_node(child, f'{where}/{child.title}'))
+    return errors
+
+
 def check_node(expected: Node, actual: Node, where: str = 'document') -> list[str]:
+    if expected.flexible:
+        return check_flexible_node(actual, where)
     errors = check_body(expected, actual, where)
     standalone_absence = False
     if any(child.repeat and not child.required for child in expected.children):
@@ -313,6 +335,8 @@ def check_template(text: str) -> list[str]:
         def walk(node):
             patterns = set()
             lines = prose_without_fences('\n'.join(node.body)).splitlines()
+            if node.flexible and (node.children or node.repeat or not PLACEHOLDER.fullmatch('\n'.join(node.body).strip())):
+                errors.append(f'{name}: flexible-body section must contain one free-text placeholder, without fixed children or repetition')
             for index, _ in table_headers(lines):
                 rows = table_rows(lines, index)
                 columns = len(table_cells(lines[index]))

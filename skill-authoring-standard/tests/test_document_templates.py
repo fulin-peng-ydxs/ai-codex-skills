@@ -57,6 +57,7 @@ def filled(skeleton):
     """Create syntax fixtures only, never represent these as verified project reports."""
     out = skeleton
     out = re.sub(r' <!-- repeat(?:-required)? -->', '', out)
+    out = out.replace(' <!-- flexible-body -->', '')
     out = re.sub(r'^(`{3,}|~{3,})text verbatim$', r'\1text', out, flags=re.M)
     out = check.PLACEHOLDER.sub('样例1', out)
     lines = out.splitlines()
@@ -68,6 +69,56 @@ def filled(skeleton):
 
 
 class FixedDocumentTests(unittest.TestCase):
+    def test_skill_body_allows_useful_local_structure_inside_fixed_topics(self):
+        source = (ROOT / 'skill-authoring-standard/references/skill-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        good = good.replace('## 执行流程\n\n样例1', '''## 执行流程
+
+### 模式选择
+
+| 请求 | 下一步 | 失败出口 |
+| --- | --- | --- |
+| 仅保存已有成果 | 核对基线后保存 | 基线不明时等待选择 |
+
+### 生成步骤
+
+#### 读取依据
+
+先读取已确认输入，缺失时标明影响。
+''')
+        self.assertEqual([], check.validate(good, source))
+        # Retain the outer contract while allowing an entire topic to use subsections.
+        self.assertTrue(check.validate(good.replace('## 职责与边界\n\n样例1\n\n', ''), source))
+        self.assertTrue(check.validate(good.replace('## 输入与前置条件', '## 临时替代主题'), source))
+        self.assertTrue(check.validate(good.replace('## 输入与前置条件', '## 核心约束'), source))
+        self.assertTrue(check.validate(good + '\n## 未声明主题\n正文\n', source))
+        reordered = good.replace('## 核心约束', '## 交换主题').replace('## 产出边界与交付', '## 核心约束').replace('## 交换主题', '## 产出边界与交付')
+        self.assertTrue(check.validate(reordered, source))
+        for broken in (
+            good.replace('### 模式选择', '#### 模式选择'),
+            good.replace('### 生成步骤', '### 模式选择'),
+            good.replace('先读取已确认输入，缺失时标明影响。', ''),
+            good.replace('核对基线后保存 | 基线不明时等待选择', '核对基线后保存'),
+            good.replace('### 模式选择', '### 模式选择 <!-- flexible-body -->'),
+            good.replace('先读取已确认输入，缺失时标明影响。', '{{@未填写}}'),
+            good + '\n```bash\n未闭合代码',
+        ):
+            with self.subTest(broken=broken):
+                self.assertTrue(check.validate(broken, source))
+
+    def test_flexible_slots_do_not_relax_undeclared_report_structure(self):
+        self.assertTrue(check.validate(GOOD.replace('## 结论与范围', '## 结论与范围\n### 临时子标题\n说明'), CONTRACT))
+        self.assertTrue(check.validate(GOOD + '\n### 临时表格\n| 列 | 值 |\n| --- | --- |\n| A | B |\n', CONTRACT))
+        self.assertTrue(check.validate(GOOD.replace('- 结论：', '- 临时字段：额外内容\n- 结论：'), CONTRACT))
+        self.assertTrue(check.validate(GOOD.replace('| 场景 | 结果 | 证据 |', '| 场景 | 临时列 | 证据 |'), CONTRACT))
+        source = '```document-template\n# 名称\n## 自由内容 <!-- flexible-body -->\n{{@内容}}\n```'
+        self.assertEqual([], check.check_template(source))
+        for body in ('{{@内容}}\n### 固定子节\n{{@说明}}', '- 字段：{{@内容}}',
+                     '| 列 | 值 |\n| --- | --- |\n| {{@列}} | {{@值}} |',
+                     '{{@内容}}\n~~~bash\necho fixed\n~~~'):
+            with self.subTest(body=body):
+                self.assertTrue(check.check_template(source.replace('{{@内容}}', body)))
+
     def test_requirement_goal_absence_cannot_waive_missing_integration_acceptance(self):
         source = (ROOT / 'requirement-doc-authoring/references/requirement-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
