@@ -19,6 +19,118 @@ WRAPPERS = {
     "sed", "xargs", "find", "timeout", "nice", "nohup", "watch", "eval", "exec",
     "command", "source", ".",
 }
+DOCKER_BOOLEAN_FLAGS = {"--debug", "--tls", "--tlsverify", "--help", "--version"}
+DOCKER_VALUE_FLAGS = {
+    "--config", "--context", "--host", "--log-level", "--tlscacert", "--tlscert", "--tlskey",
+}
+DOCKER_SHORT_FLAGS = {
+    "D": "--debug", "c": "--context", "H": "--host", "l": "--log-level",
+    "h": "--help", "v": "--version",
+}
+DOCKER_GROUPS = {
+    "builder", "buildx", "checkpoint", "compose", "config", "container", "context",
+    "desktop", "image", "manifest", "network", "node", "plugin", "secret", "service",
+    "stack", "swarm", "system", "trust", "volume",
+}
+
+
+def docker_arguments(argv, *, pattern=False):
+    """Locate Docker verbs without moving or interpreting command operands.
+
+    Only global flags before the root verb or a management verb are parsed.
+    Cosmetic flags are omitted from matching; endpoint/security flags stay
+    visible to policy rules. Never scan exec payloads or inspect object names.
+    """
+    if not argv or Path(argv[0]).name != "docker":
+        return argv
+
+    def globals_at(index):
+        kept = []
+        while index < len(argv) and argv[index].startswith("-"):
+            argument = argv[index]
+            index += 1
+            if argument.startswith("--"):
+                option, separator, value = argument.partition("=")
+                parts = [(option, value if separator else None)]
+            else:
+                parts, short = [], argument[1:]
+                if not short:
+                    raise ValueError("invalid Docker global option")
+                while short:
+                    option = DOCKER_SHORT_FLAGS.get(short[0])
+                    if option is None:
+                        raise ValueError("unknown Docker global option")
+                    short = short[1:]
+                    if option in DOCKER_VALUE_FLAGS or short.startswith("="):
+                        parts.append((option, short.removeprefix("=") if short else None))
+                        break
+                    parts.append((option, None))
+            for option, value in parts:
+                if option in DOCKER_VALUE_FLAGS:
+                    if value is None:
+                        if index == len(argv) or argv[index].startswith("-"):
+                            raise ValueError("missing Docker global option value")
+                        value = argv[index]
+                        index += 1
+                    if not value:
+                        raise ValueError("empty Docker global option value")
+                    if option == "--log-level":
+                        if not pattern and value not in {"debug", "info", "warn", "error", "fatal"}:
+                            raise ValueError("invalid Docker log level")
+                    else:
+                        kept.extend([option, value])
+                elif option in DOCKER_BOOLEAN_FLAGS:
+                    if not pattern and value is not None and value not in {"1", "0", "t", "T", "f", "F", "true", "True", "TRUE", "false", "False", "FALSE"}:
+                        raise ValueError("invalid Docker boolean option")
+                    if option not in {"--debug", "--help", "--version"}:
+                        if value is None or value in {"1", "t", "T", "true", "True", "TRUE"}:
+                            value = "true"
+                        elif value in {"0", "f", "F", "false", "False", "FALSE"}:
+                            value = "false"
+                        kept.append(option + "=" + value)
+                else:
+                    raise ValueError("unknown Docker global option")
+        return index, kept
+
+    index, kept = globals_at(1)
+    normalized = [argv[0]] + kept
+    if index < len(argv):
+        command = argv[index]
+        if pattern and any(c in command for c in "*?["):
+            if command != "**" or index != len(argv) - 1:
+                raise ValueError("ambiguous Docker deny command path")
+        normalized.append(command)
+        index += 1
+        if command in DOCKER_GROUPS:
+            index, kept = globals_at(index)
+            normalized.extend(kept)
+            if pattern and index < len(argv) and any(c in argv[index] for c in "*?["):
+                if argv[index] != "**" or index != len(argv) - 1:
+                    raise ValueError("ambiguous Docker deny management command")
+    return normalized + argv[index:]
+
+
+def docker_deny_arguments(argv):
+    """Compile the same canonical view for deny patterns, retaining their source.
+
+    Alternatives are expanded before parsing flag arity. Ambiguous prefixes or
+    excessive combinations reject the policy instead of weakening its denies.
+    """
+    if not argv:
+        return [argv]
+    programs = choices(argv[0])
+    if any(fnmatchcase("docker", Path(program).name) and Path(program).name != "docker" for program in programs):
+        if argv not in (["**"], ["*", "**"]):
+            raise ValueError("Docker deny requires an unambiguous executable")
+    if not any(Path(program).name == "docker" for program in programs):
+        return [argv]
+    variants = [[]]
+    for part in argv:
+        options = choices(part)
+        if len(variants) * len(options) > 256:
+            raise ValueError("too many Docker deny alternatives")
+        variants = [prefix + [option] for prefix in variants for option in options]
+    return [docker_arguments(variant, pattern=True) for variant in variants]
 
 
 def tokens(text):
@@ -111,6 +223,11 @@ def validate(policy):
 
     if "scenarios" in policy:
         rules = {"deny": parse_rules(policy["deny"], True), "scenarios": []}
+        rules["normalized_deny"] = [
+            (pattern, normalized)
+            for pattern, parsed in rules["deny"]
+            for normalized in docker_deny_arguments(parsed)
+        ]
         if not isinstance(policy["scenarios"], list) or not policy["scenarios"]:
             raise ValueError("invalid scenarios")
         names, prefixes = set(), set()
@@ -128,6 +245,9 @@ def validate(policy):
             argv = tokens(prefix) if prefix else []
             if any(any(c in part for c in "*?[]{}") for part in argv) or tuple(argv) in prefixes:
                 raise ValueError("scenario prefixes must be unique literal argv")
+            argv = docker_arguments(argv)
+            if tuple(argv) in prefixes:
+                raise ValueError("scenario prefixes must be unique after normalization")
             names.add(name)
             prefixes.add(tuple(argv))
             rules["scenarios"].append({
@@ -175,6 +295,16 @@ def classify(policy, server_id, user, command):
     ):
         return dict(report, reason="wrapped-command")
     if scoped:
+        try:
+            normalized = docker_arguments(argv)
+        except ValueError:
+            return dict(report, reason="unsupported-docker-options")
+        # Always compare canonical pairs, even when the command was already
+        # canonical but its deny pattern used a short/equal-sign spelling.
+        for pattern, parsed in rules["normalized_deny"]:
+            if matches(parsed, normalized, alternatives=True):
+                return dict(report, decision="deny", reason="deny-pattern", pattern=pattern)
+        argv = normalized
         candidates = [scenario for scenario in rules["scenarios"]
                       if argv[:len(scenario["prefix"])] == scenario["prefix"]]
         if not candidates:

@@ -593,6 +593,21 @@ class FixedDocumentTests(unittest.TestCase):
         snippet = '### 共用筛选状态\n- 现状与依据：已比较两处。\n- 判断与边界：复用已有入口。\n- 消费方与处理：迁移两处。\n- 验证与维护：安排回归。\n\n'
         self.assertTrue(check.validate(good.replace('## 3. 验收与交付', snippet + '## 3. 验收与交付'), source))
 
+    def test_operation_workflow_command_rule_fragments_resolve_to_real_sections(self):
+        skill = ROOT / 'operation-workflow/SKILL.md'
+        references = re.findall(r'\]\((references/command-policy\.md)#([^)]*)\)', skill.read_text())
+        self.assertTrue(references)
+        for relative, fragment in references:
+            tree = check.parse_tree((skill.parent / relative).read_text())
+            nodes, headings = [tree], set()
+            while nodes:
+                node = nodes.pop()
+                headings.add(node.title)
+                nodes.extend(node.children)
+            # These Chinese fragments directly name headings; use the shared
+            # Markdown parser so code-fence content cannot satisfy the route.
+            self.assertIn(fragment, headings, relative + '#' + fragment)
+
     def test_operation_review_and_evidence_are_separate_contracts(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         blocks = check.template_blocks(source)
@@ -650,6 +665,7 @@ class FixedDocumentTests(unittest.TestCase):
                 review = filled(blocks['record']).replace('- 人工决定：样例1', '- 人工决定：' + state)
                 review = review.replace('- 结果与证据：样例1', '- 结果与证据：未执行；缺批准或必要权限。')
                 pending = evidence[:begin] + absence + evidence[end:]
+                pending = pending.replace('- 策略依据：样例1', '- 策略依据：命令allow，仅免逐条询问；整体变更方案仍按人工决定字段判断。')
                 pending = pending.replace('```text\n样例1\n```', '```text\n' + state + '\n```', 1)
                 self.assertEqual([], check.validate(review, source, 'record'))
                 self.assertEqual([], check.validate(pending, source, 'execution'))

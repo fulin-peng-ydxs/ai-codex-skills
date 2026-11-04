@@ -113,6 +113,143 @@ class CommandTests(unittest.TestCase):
             with self.subTest(suffix=suffix):
                 self.assertEqual('ask', self.decision(DOCKER+suffix)['decision'])
 
+    def test_docker_global_options_cannot_shift_mutation_verbs(self):
+        flags = ['--debug', '-D', '--debug=false', '-D=false',
+                 '--log-level error', '--log-level=error', '-l error', '-lerror',
+                 '-l=error', '-Dlerror', '--help=false', '-h=false',
+                 '--version=false', '-v=false', '-Dv=false']
+        for flag in flags:
+            for group, action in [('service', 'update --force portal'),
+                                  ('container', 'exec portal id'),
+                                  ('volume', 'remove data')]:
+                for command in [DOCKER+flag+' '+group+' '+action,
+                                'docker '+flag+' --host unix:///var/run/docker.sock '+group+' '+action,
+                                DOCKER+group+' '+flag+' '+action]:
+                    with self.subTest(command=command):
+                        self.assertEqual('ask', self.decision(command)['decision'])
+            for command in [DOCKER+flag+' service inspect rm',
+                            'docker '+flag+' --host unix:///var/run/docker.sock container inspect remove',
+                            DOCKER+'service '+flag+' inspect exec']:
+                with self.subTest(query=command):
+                    self.assertEqual('allow', self.decision(command)['decision'])
+        for command in ['docker -DHunix:///var/run/docker.sock service update --force portal',
+                        'docker --host=unix:///var/run/docker.sock -D container exec portal id']:
+            self.assertEqual('ask', self.decision(command)['decision'])
+
+    def test_docker_mutation_aliases_have_identical_decisions(self):
+        for area in ['container', 'image', 'volume', 'network', 'service', 'stack',
+                     'node', 'config', 'secret', 'context', 'plugin']:
+            for verb in ['rm', 'remove']:
+                for flag in ['', '--debug ']:
+                    command = DOCKER+flag+area+' '+verb+' target'
+                    with self.subTest(command=command):
+                        self.assertEqual('ask', self.decision(command)['decision'])
+        for suffix in ['stack down app', 'stack deploy -c stack.yml app', 'stack up -c stack.yml app',
+                       'debug portal', 'init', 'rm portal', 'rmi image', 'rename old new']:
+            self.assertEqual('ask', self.decision(DOCKER+suffix)['decision'])
+        for suffix in ['--debug inspect debug', 'service inspect remove', 'container inspect rm']:
+            self.assertEqual('allow', self.decision(DOCKER+suffix)['decision'])
+
+    def test_unknown_or_malformed_docker_global_options_do_not_default_allow(self):
+        for suffix in ['--unknown service update --force portal',
+                       'service --unknown update --force portal',
+                       '--log-level', '--log-level --debug service update',
+                       '--log-level=invalid service update', '--debug=invalid service update',
+                       '-DZ service update', '-- service update',
+                       '--tlsverify=false service ls', 'service --tls ls']:
+            with self.subTest(suffix=suffix):
+                self.assertEqual('ask', self.decision(DOCKER+suffix)['decision'])
+        argv = GATE.tokens(DOCKER+'container exec portal echo --debug --log-level=error')
+        self.assertEqual(argv, GATE.docker_arguments(argv))
+        argv = GATE.tokens(DOCKER+"service inspect --format '{{.Spec.Name}}' remove")
+        self.assertEqual(argv, GATE.docker_arguments(argv))
+
+    def test_normalized_matching_preserves_deny_priority_and_prefix_identity(self):
+        self.policy['deny'].append(DOCKER+'service update **')
+        self.assertEqual('deny', self.decision(DOCKER+'--debug service update --force portal')['decision'])
+        alternate = deepcopy(self.policy['scenarios'][0])
+        alternate['name'] = 'same-endpoint'
+        alternate['prefix'] = 'docker -Hunix:///var/run/docker.sock'
+        self.policy['scenarios'].append(alternate)
+        self.assertEqual('invalid-policy', self.decision(DOCKER+'ps')['reason'])
+
+    def test_deny_host_option_spellings_cross_match_with_display_flags(self):
+        prefixes = [
+            'docker -Hunix:///var/run/docker.sock',
+            'docker -H unix:///var/run/docker.sock',
+            'docker -H=unix:///var/run/docker.sock',
+            'docker --host unix:///var/run/docker.sock',
+            'docker --host=unix:///var/run/docker.sock',
+        ]
+        original = list(self.policy['deny'])
+        for rule_prefix in prefixes:
+            rule = rule_prefix+' service inspect **'
+            self.policy['deny'] = original+[rule]
+            for command_prefix in prefixes:
+                for flags in ['', '--debug ', '-D ', '--log-level=error ', '-Dlerror ']:
+                    for suffix in [flags+'service inspect portal', 'service '+flags+'inspect portal']:
+                        command = command_prefix+' '+suffix
+                        with self.subTest(rule=rule, command=command):
+                            result = self.decision(command)
+                            self.assertEqual('deny', result['decision'])
+                            self.assertEqual(rule, result['pattern'])
+            self.assertEqual('allow', self.decision(DOCKER+'service ls')['decision'])
+            self.assertEqual('allow', self.decision(DOCKER+'container inspect portal')['decision'])
+
+    def test_deny_patterns_normalize_groups_glob_values_and_keep_operands_literal(self):
+        for rule in [
+            'docker {-Hunix:///var/run/docker.sock,--host=unix:///var/run/docker.sock} service inspect **',
+            '{docker,podman} -Hunix:///var/run/docker.sock service inspect **',
+            'docker -H* service inspect **',
+            'docker --log-level=* -Hunix:///var/run/docker.sock service inspect **',
+            'docker -Hunix:///var/run/docker.sock {container,service} inspect **',
+        ]:
+            with self.subTest(rule=rule):
+                self.policy['deny'] = [rule]
+                self.assertEqual('deny', self.decision(DOCKER+'--debug service inspect portal')['decision'])
+        self.policy['deny'] = ['docker -Hunix:///var/run/docker.sock container exec portal echo -Hliteral']
+        result = self.decision(DOCKER+'--debug container exec portal echo -Hliteral')
+        self.assertEqual('deny', result['decision'])
+        # An exec operand is not a Docker global host option.
+        result = self.decision(DOCKER+'--debug container exec portal echo --host literal')
+        self.assertEqual('ask', result['decision'])
+        self.policy['deny'] = ['docker -Hunix:///var/run/docker.sock **']
+        self.assertEqual('deny', self.decision(DOCKER+'ps')['decision'])
+
+    def test_deny_boolean_spellings_are_equivalent_without_merging_true_and_false(self):
+        enabled = ['--tlsverify', '--tlsverify=true', '--tlsverify=1', '--tlsverify=T']
+        disabled = ['--tlsverify=false', '--tlsverify=0', '--tlsverify=F']
+        for variants, opposite in [(enabled, disabled), (disabled, enabled)]:
+            for spelling in variants:
+                self.policy['deny'] = [DOCKER+spelling+' service inspect **']
+                for actual in variants:
+                    with self.subTest(rule=spelling, actual=actual):
+                        self.assertEqual('deny', self.decision(DOCKER+actual+' --debug service inspect portal')['decision'])
+                for actual in opposite:
+                    self.assertEqual('ask', self.decision(DOCKER+actual+' service inspect portal')['decision'])
+
+    def test_unresolvable_docker_deny_does_not_silently_disappear(self):
+        for rule in [
+            'docker --unknown service inspect **',
+            'docker ** -Hunix:///var/run/docker.sock service inspect **',
+            'dock* -Hunix:///var/run/docker.sock service inspect **',
+            'docker --host unix:///var/run/docker.sock service * --host other',
+            'docker --host {a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q} service inspect {a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q}',
+        ]:
+            with self.subTest(rule=rule):
+                self.policy['deny'] = [rule]
+                self.assertEqual('invalid-policy', self.decision(DOCKER+'ps')['reason'])
+
+    def test_broken_policy_stays_distinct_from_an_ordinary_approved_ask(self):
+        ordinary = self.decision(DOCKER+'service update --force portal')
+        self.assertEqual('scenario-exception', ordinary['reason'])
+        self.policy['scenarios'][0]['ask'] = None
+        broken = self.decision(DOCKER+'service update --force portal')
+        self.assertEqual('ask', broken['decision'])
+        self.assertEqual('invalid-policy', broken['reason'])
+        self.assertIsNone(broken['pattern'])
+        self.assertNotIn('scenario', broken)
+
     def test_general_whitelist_stays_narrow_without_an_ask_table(self):
         for command in [
             'cat /etc/os-release', 'free -h', 'df -hPT /opt', 'stat -- /opt/app/config',
@@ -284,6 +421,7 @@ class CommandTests(unittest.TestCase):
                                      '--policy', str(path), '--server-id', 'test-01',
                                      '--user', 'ops', '--command', 'id'], capture_output=True, text=True)
             self.assertEqual(2, result.returncode)
+            self.assertEqual('invalid-policy', json.loads(result.stdout)['reason'])
 
 
 if __name__ == '__main__':

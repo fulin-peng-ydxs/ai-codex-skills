@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": [],
   "approval_ref": null,
   "deny": [
@@ -14,11 +14,11 @@
       "prefix": "docker --host unix:///var/run/docker.sock",
       "default": "allow",
       "ask": [
-        "{run,create,exec,attach,cp,build,pull,push,load,import,export,save,commit,restart,start,stop,kill,rm,rmi,prune,login,logout,rename,update,pause,unpause,wait,tag} **",
-        "{container,image,service,stack,volume,network,node,swarm,secret,config,context,plugin,system} {create,update,rm,prune} **",
+        "{debug,init,run,create,exec,attach,cp,build,pull,push,load,import,export,save,commit,restart,start,stop,kill,rm,rmi,prune,login,logout,rename,update,pause,unpause,wait,tag} **",
+        "{container,image,service,stack,volume,network,node,swarm,secret,config,context,plugin,system} {create,update,rm,remove,prune} **",
         "container {run,exec,attach,cp,export,commit,restart,start,stop,kill,rename,pause,unpause,wait} **",
         "service {rollback,scale} **",
-        "stack deploy **",
+        "stack {deploy,up,down} **",
         "image {build,pull,push,load,import,save,tag} **",
         "network {connect,disconnect} **",
         "node {promote,demote} **",
@@ -27,7 +27,7 @@
         "plugin {install,enable,disable,upgrade,set,push} **",
         "config inspect **",
         "{compose,buildx,builder,checkpoint} **",
-        "** {--host,--host=*,-H,-H?*,--context,--context=*,-c,-c?*,--config,--config=*,--tlscacert,--tlscacert=*,--tlscert,--tlscert=*,--tlskey,--tlskey=*} **",
+        "** {--host,--host=*,-H,-H?*,--context,--context=*,-c,-c?*,--config,--config=*,--tls,--tls=*,--tlsverify,--tlsverify=*,--tlscacert,--tlscacert=*,--tlscert,--tlscert=*,--tlskey,--tlskey=*} **",
         "** {--format,-f} {*Env*,*Args*,*Cmd*,*Data*,*Command*} **",
         "** {--format=*Env*,--format=*Args*,--format=*Cmd*,--format=*Data*,--format=*Command*,-f?*Env*,-f?*Args*,-f?*Cmd*,-f?*Data*,-f?*Command*} **",
         "logs ** {--follow,--follow=*,-*f*,--details,--details=*} **",
