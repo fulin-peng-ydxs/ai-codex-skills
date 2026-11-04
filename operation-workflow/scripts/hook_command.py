@@ -176,9 +176,18 @@ def confirmed_command(rows, payload, title):
                     and question.get("phase") == "final_answer"
                     and question.get("text") == conversation_question(title)):
                 return item["id"] if accepted else False
-            if (question_id and question.get("type") == "agentMessage" and question.get("id") == question_id[1]
-                    and question.get("questions") == [{"title": title, "options": [CONFIRM, "取消"]}]):
-                return item["id"] if accepted else False
+            if question_id and question.get("type") == "agentMessage" and question.get("id") == question_id[1]:
+                questions = question.get("questions")
+                if not isinstance(questions, list) or len(questions) != 1:
+                    return None
+                asked = questions[0]
+                options = asked.get("options") if isinstance(asked, dict) else None
+                # Bind the real question and action set; display order is not
+                # authority. Missing, duplicated or substituted actions fail closed.
+                if (isinstance(asked, dict) and asked.get("title") == title and isinstance(options, list)
+                        and len(options) == 2 and all(isinstance(option, str) for option in options)
+                        and set(options) == {CONFIRM, "取消"}):
+                    return item["id"] if accepted else False
         return None
     return None
 
@@ -310,19 +319,10 @@ def evaluate(payload, project_root, operations_root=DEFAULT_OPERATIONS_ROOT, hos
     command = tool_input.get("command", tool_input.get("cmd"))
     if "command" in tool_input and "cmd" in tool_input and tool_input["command"] != tool_input["cmd"]:
         return result("stop", "conflicting-command-fields")
-    try:
-        argv = gate.tokens(command)
-        if gate.has_shell_expansion(command):
-            raise ValueError("shell expansion")
-    except ValueError:
-        return result("stop", "unsupported-shell")
-    executable = Path(argv[0]).name
-    if executable != "ssh":
-        if (executable in gate.WRAPPERS or executable == "docker" or "=" in argv[0]
-                or re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", executable)
-                or executable.endswith((".sh", ".py", ".pl", ".rb", ".js"))):
-            return result("stop", "unbound-or-wrapped-command")
-        return result("pass", "local-host-permissions")
+    local = gate.classify_local(command, root, operations_root)
+    if local is not None:
+        return local
+    argv = gate.tokens(command)
     try:
         address, port, user, remote_command = ssh_target(argv)
     except ValueError:
@@ -391,7 +391,8 @@ def host_response(report, host):
         if report.get("confirmation_error"):
             message += "; "+report["confirmation_error"]+"; stop and restore confirmation context/storage; do not repeatedly ask the user"
         elif "confirmation_question" in report:
-            message += ("; ask the user with request_user_input_async using exactly this single question, "
+            message += ("; ask the user with request_user_input_async using this exact title and these two actions "
+                        "(display order may differ), "
                         "wait for their answer, then retry the unchanged command once. This is task "
                         "authorization; keep all host execution permission checks unchanged. If the "
                         "question tool is unavailable or disallowed, explain why and ask the same title "

@@ -135,7 +135,7 @@ Docker规则须有可确定的程序名及全局参数/命令前缀，仍支持`
 
 ### 传输与包装边界
 
-SSH由[宿主接入](host-integration.md#覆盖与失败边界)核对传输和目标后，将远端内层命令交给判定器；连接授权按主流程处理。直接把SSH包装传给判定器仍会得到`wrapped-command`。
+宿主先消费同一check_command.py的classify_local识别[受控本地校验入口](host-integration.md#受控本地校验入口)，它不借用远端策略。SSH由[宿主接入](host-integration.md#覆盖与失败边界)核对传输和目标后，将远端内层命令交给classify；连接授权按主流程处理。直接把SSH包装传给远端分类器仍会得到wrapped-command；本地校验入口不解除远端脚本或解释器的停止分支。
 
 sudo、脚本、解释器、`builtin`以及Docker根入口/`container`入口的`exec`、`run`属于包装。两个策略格式均在放行规则之前返回`wrapped-command`，即使策略例外列出了这些动词也不能改变该停止分支。Docker按实际动词位置识别，`inspect exec`等对象名不受影响。
 
@@ -156,7 +156,7 @@ sudo、脚本、解释器、`builtin`以及Docker根入口/`container`入口的`
 配置验证覆盖两种模式：未命中例外时确实采用默认行为；命中时按反向例外决定；共同deny优先；规则与命令分别采用短/长/等号形式并加入显示参数时交叉同判；同一场景同时含allow/ask必须报错；重叠前缀只选一个；备选动词、参数变体、对象名rm/exec、未登记目标、草案及旧格式均有正反例。复用原判定器和测试，不另建平行权限系统。
 
 ```bash
-python3 <技能目录>/scripts/check_command.py \
+<已核验Python绝对路径> <技能目录>/scripts/check_command.py \
   --policy <项目策略.json> \
   --server-id <服务器ID> \
   --user <账号> \

@@ -143,6 +143,71 @@ class HookTests(unittest.TestCase):
         event["cwd"]=str(self.project.parent)
         self.assertEqual("outside-project",hook.evaluate(event,self.project)["reason"])
 
+    def local_event(self, argv):
+        event = self.event()
+        event['tool_input']['command'] = shlex.join(argv)
+        return event
+
+    def test_trusted_local_checks_work_without_server_registration(self):
+        # A local document check must not require SSH or borrow remote allow.
+        document = self.project/'record.md'
+        document.write_text('# Fixture\n')
+        skills = ROOT.parent
+        validator = skills/'skill-authoring-standard/scripts/validate_document_template.py'
+        template = ROOT/'references/output-templates.md'
+        commands = [
+            [sys.executable, str(validator), str(document), '--template', str(template), '--block', 'record'],
+            [sys.executable, str(validator), '--template', str(template), '--check-template'],
+            [sys.executable, str(ROOT/'scripts/check_archive.py'), 'index', '--repo', str(self.project),
+             '--operations-root', 'agent-works/operations'],
+            [sys.executable, str(skills/'.system/skill-creator/scripts/quick_validate.py'), str(ROOT)],
+            [sys.executable, '-m', 'unittest', 'discover', '-s', str(ROOT/'tests'), '-p', 'test_*.py'],
+            [sys.executable, str(ROOT/'scripts/check_command.py'), '--policy', str(self.ops/'command-policy.json'),
+             '--server-id', 'fixture', '--user', 'operator', '--command', 'id'],
+        ]
+        (self.ops/'servers.yaml').unlink()
+        for argv in commands:
+            with self.subTest(argv=argv):
+                self.assertEqual({'decision': 'pass', 'reason': 'trusted-local-check'},
+                                 hook.evaluate(self.local_event(argv), self.project))
+
+    def test_local_helper_rejects_arbitrary_code_flags_and_path_escapes(self):
+        document = self.project/'record.md'
+        document.write_text('# Fixture\n')
+        validator = ROOT.parent/'skill-authoring-standard/scripts/validate_document_template.py'
+        template = ROOT/'references/output-templates.md'
+        base = [sys.executable, str(validator), str(document), '--template', str(template)]
+        outside = self.project.parent/(self.project.name+'-outside.md')
+        outside.write_text('# Outside\n')
+        self.addCleanup(outside.unlink)
+        link = self.project/'linked.md'
+        link.symlink_to(outside)
+        fake = self.project/'validate_document_template.py'
+        fake.write_text('raise SystemExit("must not execute")\n')
+        bad = [
+            ['python3', str(validator), str(document), '--template', str(template)],
+            [sys.executable, '-c', 'print("not allowed")'],
+            [sys.executable, str(fake), str(document)],
+            [sys.executable, '-m', 'unittest', 'discover', '-s', str(self.project)],
+            [sys.executable, '-m', 'unittest', 'discover', '-s', str(ROOT/'tests'), '-p', '../*.py'],
+            base+['--unknown', 'anything'], base+['--block', 'record', '--block', 'execution'],
+            base+['--template', str(template)],
+            [sys.executable, str(validator), str(link), '--template', str(template)],
+            [sys.executable, str(validator), str(outside), '--template', str(template)],
+            [sys.executable, str(validator), str(document), '--template', str(document)],
+            [sys.executable, str(ROOT/'scripts/check_archive.py'), 'index', '--repo', str(self.project.parent),
+             '--operations-root', 'agent-works/operations'],
+            [sys.executable, str(ROOT/'scripts/check_archive.py'), 'index', '--repo', str(self.project),
+             '--operations-root', '../elsewhere'],
+            [sys.executable, str(ROOT/'scripts/hook_command.py'), '--host', 'codex',
+             '--project-root', str(self.project)],
+        ]
+        for argv in bad:
+            with self.subTest(argv=argv):
+                report = hook.evaluate(self.local_event(argv), self.project)
+                self.assertEqual('stop', report['decision'])
+                self.assertEqual('unbound-or-wrapped-command', report['reason'])
+
 
     def test_ambiguous_inventory_and_escaping_policy_stop(self):
         self.servers["servers"] *= 2
@@ -301,6 +366,20 @@ class HookTests(unittest.TestCase):
             copy = json.loads(json.dumps(rows)); mutate(copy)
             self.assertEqual("ask", hook.evaluate(event, self.project, host="codex", history_reader=lambda *_: copy)["decision"])
 
+    def test_action_order_is_presentation_but_action_set_and_question_are_bound(self):
+        for answer, expected in [(hook.CONFIRM, 'allow'), ('取消', 'stop')]:
+            event = self.event(self.docker+'service update --force redis')
+            _, rows = self.command_confirmation(event, answer=answer)
+            rows[1]['item']['questions'][0]['options'].reverse()
+            report = hook.evaluate(event, self.project, host='codex', history_reader=lambda *_: rows)
+            self.assertEqual(expected, report['decision'])
+        for options in [[hook.CONFIRM], [hook.CONFIRM, hook.CONFIRM], [hook.CONFIRM, '总是允许'], None]:
+            event = self.event(self.docker+'service update --force redis')
+            _, rows = self.command_confirmation(event)
+            rows[1]['item']['questions'][0]['options'] = options
+            report = hook.evaluate(event, self.project, host='codex', history_reader=lambda *_: rows)
+            self.assertEqual('ask', report['decision'])
+
     def test_confirmation_does_not_cover_changed_command_target_or_policy(self):
         event = self.event(self.docker+"service update --force redis")
         _, rows = self.command_confirmation(event)
@@ -428,8 +507,7 @@ class HookTests(unittest.TestCase):
             "--host", "codex", "--project-root", str(self.project), "--print-config"])
         active = subprocess.run(shlex.split(registered), input=json.dumps(event), text=True,
                                 capture_output=True, timeout=10)
-        self.assertEqual(2, active.returncode)
-        self.assertIn("unbound-or-wrapped-command", active.stderr)
+        self.assertEqual(0, active.returncode, active.stderr)
         marker = self.project/"probe-count"
         fake = self.project/"ssh"
         fake.write_text("#!"+sys.executable+"\nwith open("+repr(str(marker))+", 'a') as f: f.write('probe\\n')\n")

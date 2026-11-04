@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 import shlex
+import sys
 
 
 EXIT_CODES = {"allow": 0, "ask": 2, "deny": 3}
@@ -32,6 +33,147 @@ DOCKER_GROUPS = {
     "desktop", "image", "manifest", "network", "node", "plugin", "secret", "service",
     "stack", "swarm", "system", "trust", "volume",
 }
+
+
+def _local_options(arguments, values=(), switches=()):
+    """Parse only a reviewed helper's fixed CLI; no interpreter/unknown flags."""
+    positional, options = [], {}
+    index = 0
+    while index < len(arguments):
+        value = arguments[index]
+        index += 1
+        if not value.startswith('-'):
+            positional.append(value)
+            continue
+        flag, separator, inline = value.partition('=')
+        if flag in options or flag not in set(values) | set(switches):
+            raise ValueError('unsupported helper option')
+        if flag in switches:
+            if separator:
+                raise ValueError('invalid helper switch')
+            options[flag] = True
+        else:
+            if not separator:
+                if index == len(arguments) or arguments[index].startswith('-'):
+                    raise ValueError('missing helper argument')
+                inline = arguments[index]
+                index += 1
+            if not inline:
+                raise ValueError('empty helper argument')
+            options[flag] = inline
+    return positional, options
+
+
+def _local_path(value, roots, *, directory=False, markdown=False):
+    """Require explicit existing paths, with no traversal or symlink escape."""
+    path = Path(value)
+    if not path.is_absolute() or any(part in {'.', '..', '.git'} for part in path.parts):
+        raise ValueError('noncanonical helper path')
+    resolved = path.resolve(strict=True)
+    if path != resolved or not any(resolved.is_relative_to(root) for root in roots):
+        raise ValueError('helper path outside approved roots')
+    if directory:
+        if not resolved.is_dir():
+            raise ValueError('helper directory required')
+    elif not resolved.is_file() or resolved.stat().st_size > 15_000_000:
+        raise ValueError('helper input must be a bounded regular file')
+    if markdown and resolved.suffix != '.md':
+        raise ValueError('Markdown input required')
+    return resolved
+
+
+def _trusted_local_helper(argv, project_root, operations_root):
+    """Recognize read-only skill checks, never arbitrary Python payloads.
+
+    This is a trust boundary for installed helper code, not a Python sandbox.
+    Remote policy rules remain unchanged; adapters must consume this one entry.
+    """
+    # Hook and tool processes may have different PATHs. Bind the executor to
+    # the registered interpreter's explicit path, never to an ambiguous alias.
+    interpreter = Path(argv[0])
+    if not interpreter.is_absolute() or interpreter.resolve() != Path(sys.executable).resolve():
+        return False
+    skills = Path(__file__).resolve().parents[2]
+    project = Path(project_root).resolve(strict=True)
+
+    def document(value):
+        path = _local_path(value, (project, skills), markdown=True)
+        if not path.is_relative_to(project):
+            name = path.relative_to(skills).parts[0]
+            if name.startswith('.') or not (skills/name/'SKILL.md').is_file():
+                raise ValueError('document is not in an installed skill')
+        return path
+
+    arguments = argv[1:]
+    if arguments[:3] == ['-m', 'unittest', 'discover']:
+        positional, options = _local_options(arguments[3:], ('-s', '-p'), ('-v',))
+        if positional or '-s' not in options:
+            return False
+        tests = _local_path(options['-s'], (skills,), directory=True)
+        pattern = options.get('-p', 'test*.py')
+        return (tests == skills/'operation-workflow/tests'
+                and bool(re.fullmatch(r'test[A-Za-z0-9_*]*\.py', pattern)))
+    if not arguments:
+        return False
+    script = _local_path(arguments[0], (skills,))
+    tail = arguments[1:]
+    if script == skills/'skill-authoring-standard/scripts/validate_document_template.py':
+        positional, options = _local_options(tail, ('--template', '--block'), ('--check-template',))
+        if '--template' not in options or len(positional) != (0 if options.get('--check-template') else 1):
+            return False
+        template = _local_path(options['--template'], (skills,), markdown=True)
+        relative = template.relative_to(skills)
+        if (len(relative.parts) < 3 or relative.parts[1] != 'references'
+                or relative.parts[0].startswith('.') or not (skills/relative.parts[0]/'SKILL.md').is_file()):
+            return False
+        if positional:
+            document(positional[0])
+        return bool(re.fullmatch(r'[a-z][a-z0-9-]*', options.get('--block', 'document')))
+    if script == skills/'operation-workflow/scripts/check_archive.py':
+        positional, options = _local_options(tail, ('--repo', '--operations-root'))
+        return (positional == ['index'] and set(options) == {'--repo', '--operations-root'}
+                and _local_path(options['--repo'], (project,), directory=True) == project
+                and options['--operations-root'] == operations_root)
+    if script == skills/'.system/skill-creator/scripts/quick_validate.py':
+        if len(tail) != 1:
+            return False
+        target = _local_path(tail[0], (skills,), directory=True)
+        return (target/'SKILL.md').is_file()
+    if script == skills/'operation-workflow/scripts/check_command.py':
+        positional, options = _local_options(tail, ('--policy', '--server-id', '--user', '--command'))
+        return (not positional and set(options) == {'--policy', '--server-id', '--user', '--command'}
+                and _local_path(options['--policy'], (project,)) == project/operations_root/'command-policy.json')
+    if script == skills/'operation-workflow/scripts/hook_command.py':
+        positional, options = _local_options(tail, ('--host', '--project-root', '--operations-root'), ('--print-config',))
+        return (not positional and options.get('--print-config') is True
+                and options.get('--host') == 'codex' and '--project-root' in options
+                and _local_path(options['--project-root'], (project,), directory=True) == project
+                and options.get('--operations-root', operations_root) == operations_root)
+    return False
+
+
+def classify_local(command, project_root, operations_root):
+    """Return local pass/stop, or None for SSH transport classification."""
+    try:
+        argv = tokens(command)
+        if has_shell_expansion(command):
+            raise ValueError('shell expansion')
+    except ValueError:
+        return {'decision': 'stop', 'reason': 'unsupported-shell'}
+    executable = Path(argv[0]).name
+    if executable == 'ssh':
+        return None
+    if re.fullmatch(r'python(?:\d+(?:\.\d+)*)?', executable):
+        try:
+            trusted = _trusted_local_helper(argv, project_root, operations_root)
+        except (OSError, ValueError, TypeError):
+            trusted = False
+        return {'decision': 'pass' if trusted else 'stop',
+                'reason': 'trusted-local-check' if trusted else 'unbound-or-wrapped-command'}
+    if (executable in WRAPPERS or executable == 'docker' or '=' in argv[0]
+            or executable.endswith(('.sh', '.py', '.pl', '.rb', '.js'))):
+        return {'decision': 'stop', 'reason': 'unbound-or-wrapped-command'}
+    return {'decision': 'pass', 'reason': 'local-host-permissions'}
 
 
 def docker_arguments(argv, *, pattern=False):
