@@ -626,7 +626,7 @@ class FixedDocumentTests(unittest.TestCase):
         document = re.sub(r' <!-- repeat(?:-required)? -->', '', document)
         self.assertEqual([], check.validate(document, source, 'execution'))
         self.assertIn(raw, document)
-        for field in ['- 来源与范围：隔离样例1\n', '- 方案与授权：隔离样例1\n',
+        for field in ['- 会话定位：隔离样例1\n', '- 来源与范围：隔离样例1\n', '- 方案与授权：隔离样例1\n',
                       '- 执行结果：隔离样例1\n', '- 关键证据：隔离样例1\n']:
             self.assertTrue(check.validate(document.replace(field, '', 1), source, 'execution'))
 
@@ -732,6 +732,7 @@ class FixedDocumentTests(unittest.TestCase):
                                     f'| {item} | 未执行：方案尚待批准 | 无：没有实际决定或执行证据 |')
         fields = {
             '用途与归属': '隔离试填明细，人工决定见[S01/v1](record.md#方案s01v1)，不连接真实服务器。',
+            '会话定位': '隔离样例；工具为Codex，会话ID与链接均未取得，不对应真实会话。',
             '目标与身份': '模拟测试服务demo_portal；身份和提权仅为候选，执行前必须核实。',
             '连接与核验': '未连接；本测试只验证文档结构，不产生连接授权。',
             '策略依据': '模拟策略将候选命令判为allow，仅免逐条询问，整体变更仍待批准。',
