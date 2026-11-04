@@ -11,6 +11,7 @@ import shlex
 
 EXIT_CODES = {"allow": 0, "ask": 2, "deny": 3}
 FIELDS = {"version", "targets", "approval_ref", "default", "deny", "ask", "allow"}
+SCENARIO_FIELDS = {"version", "targets", "approval_ref", "deny", "scenarios"}
 OPERATORS = set(";&|<>()")
 WRAPPERS = {
     "ssh", "scp", "sftp", "sudo", "doas", "su", "env", "sh", "bash", "dash",
@@ -33,7 +34,19 @@ def tokens(text):
     return result
 
 
-def matches(pattern, argv):
+def choices(part):
+    """New-format alternatives occupy one complete argv slot, never shell code."""
+    if part.startswith("{") and not part.startswith("{{") and "," in part:
+        if not part.endswith("}") or any(c in part[1:-1] for c in "{}"):
+            raise ValueError("invalid alternatives")
+        result = part[1:-1].split(",")
+        if any(not item or item == "**" for item in result):
+            raise ValueError("invalid alternatives")
+        return result
+    return [part]
+
+
+def matches(pattern, argv, alternatives=False):
     """A glob stays inside one argument; a standalone ** spans arguments."""
     row = [True] + [False] * len(argv)
     for part in pattern:
@@ -42,8 +55,9 @@ def matches(pattern, argv):
             for index in range(1, len(row)):
                 current.append(row[index] or current[index - 1])
         else:
+            options = choices(part) if alternatives else [part]
             current = [False] + [
-                row[index - 1] and fnmatchcase(argument, part)
+                row[index - 1] and any(fnmatchcase(argument, option) for option in options)
                 for index, argument in enumerate(argv, 1)
             ]
         row = current
@@ -71,12 +85,10 @@ def has_shell_expansion(command):
 
 def validate(policy):
     """Reject incomplete/unknown fields instead of silently ignoring a rule."""
-    if not isinstance(policy, dict) or set(policy) != FIELDS:
+    if not isinstance(policy, dict) or set(policy) not in (FIELDS, SCENARIO_FIELDS):
         raise ValueError("invalid policy fields")
     if type(policy["version"]) is not int or policy["version"] < 1:
         raise ValueError("invalid version")
-    if policy["default"] != "ask":
-        raise ValueError("default must be ask")
     approval = policy["approval_ref"]
     if approval is not None and (not isinstance(approval, str) or not approval.strip()):
         raise ValueError("invalid approval reference")
@@ -87,11 +99,49 @@ def validate(policy):
             raise ValueError("invalid target fields")
         if any(not isinstance(v, str) or not v.strip() for v in target.values()):
             raise ValueError("invalid target value")
+    def parse_rules(value, alternatives=False):
+        if not isinstance(value, list):
+            raise ValueError("rules must be lists")
+        parsed = [(pattern, tokens(pattern)) for pattern in value]
+        if alternatives:
+            for _, parts in parsed:
+                for part in parts:
+                    choices(part)
+        return parsed
+
+    if "scenarios" in policy:
+        rules = {"deny": parse_rules(policy["deny"], True), "scenarios": []}
+        if not isinstance(policy["scenarios"], list) or not policy["scenarios"]:
+            raise ValueError("invalid scenarios")
+        names, prefixes = set(), set()
+        for scenario in policy["scenarios"]:
+            if not isinstance(scenario, dict) or scenario.get("default") not in ("ask", "allow"):
+                raise ValueError("invalid scenario mode")
+            exception = "ask" if scenario["default"] == "allow" else "allow"
+            if set(scenario) != {"name", "prefix", "default", exception}:
+                raise ValueError("a scenario has exactly one exception list")
+            name, prefix = scenario["name"], scenario["prefix"]
+            if not isinstance(name, str) or not name.strip() or name in names:
+                raise ValueError("invalid scenario name")
+            if not isinstance(prefix, str):
+                raise ValueError("invalid scenario prefix")
+            argv = tokens(prefix) if prefix else []
+            if any(any(c in part for c in "*?[]{}") for part in argv) or tuple(argv) in prefixes:
+                raise ValueError("scenario prefixes must be unique literal argv")
+            names.add(name)
+            prefixes.add(tuple(argv))
+            rules["scenarios"].append({
+                "name": name, "prefix": argv, "default": scenario["default"],
+                "exception": exception, "rules": parse_rules(scenario[exception], True),
+            })
+        return rules
+
+    # Existing project policies keep their original default-ask semantics.
+    if policy["default"] != "ask":
+        raise ValueError("legacy default must be ask")
     rules = {}
     for category in ("deny", "ask", "allow"):
-        if not isinstance(policy[category], list):
-            raise ValueError("rules must be lists")
-        rules[category] = [(pattern, tokens(pattern)) for pattern in policy[category]]
+        rules[category] = parse_rules(policy[category])
     return rules
 
 
@@ -109,9 +159,10 @@ def classify(policy, server_id, user, command):
         argv = tokens(command)
     except ValueError:
         return dict(report, reason="unsupported-shell")
-    for category in ("deny", "ask"):
+    scoped = "scenarios" in rules
+    for category in (("deny",) if scoped else ("deny", "ask")):
         for pattern, parsed in rules[category]:
-            if matches(parsed, argv):
+            if matches(parsed, argv, alternatives=scoped):
                 return dict(report, decision=category, reason=category + "-pattern", pattern=pattern)
     # Static argv matching cannot resolve shell pathname expansion safely.
     if has_shell_expansion(command):
@@ -123,6 +174,22 @@ def classify(policy, server_id, user, command):
         or executable.endswith((".sh", ".py", ".pl", ".rb", ".js"))
     ):
         return dict(report, reason="wrapped-command")
+    if scoped:
+        candidates = [scenario for scenario in rules["scenarios"]
+                      if argv[:len(scenario["prefix"])] == scenario["prefix"]]
+        if not candidates:
+            return dict(report, reason="scenario-not-covered")
+        scenario = max(candidates, key=lambda item: len(item["prefix"]))
+        report.update(scenario=scenario["name"], mode=scenario["default"])
+        suffix = argv[len(scenario["prefix"]):]
+        decision, reason, pattern = scenario["default"], "scenario-default", None
+        for candidate, parsed in scenario["rules"]:
+            if matches(parsed, suffix, alternatives=True):
+                decision, reason, pattern = scenario["exception"], "scenario-exception", candidate
+                break
+        if decision == "allow" and not policy["approval_ref"]:
+            return dict(report, reason="unapproved-policy", pattern=pattern)
+        return dict(report, decision=decision, reason=reason, pattern=pattern)
     for pattern, parsed in rules["allow"]:
         if matches(parsed, argv):
             reason = "allow-pattern" if policy["approval_ref"] else "unapproved-policy"

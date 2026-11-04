@@ -593,69 +593,88 @@ class FixedDocumentTests(unittest.TestCase):
         snippet = '### 共用筛选状态\n- 现状与依据：已比较两处。\n- 判断与边界：复用已有入口。\n- 消费方与处理：迁移两处。\n- 验证与维护：安排回归。\n\n'
         self.assertTrue(check.validate(good.replace('## 3. 验收与交付', snippet + '## 3. 验收与交付'), source))
 
-    def test_operation_record_keeps_demand_and_decisions_inside_one_contract(self):
+    def test_operation_review_and_evidence_are_separate_contracts(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         blocks = check.template_blocks(source)
-        self.assertEqual({'access', 'index', 'unit', 'record'}, set(blocks))
-        skeleton = blocks['record'].replace('```text verbatim', '`````text')
+        self.assertEqual({'access', 'index', 'unit', 'record', 'execution'}, set(blocks))
+        review = filled(blocks['record'])
+        for field in ['- 待办与决定：样例1\n', '- 人工决定：样例1\n',
+                      '- 影响与保障：样例1\n', '- 结果与证据：样例1\n']:
+            self.assertTrue(check.validate(review.replace(field, '', 1), source, 'record'))
+        # Raw input can contain template-like text without changing the contract.
+        skeleton = blocks['execution'].replace('```text verbatim', '`````text')
         skeleton = re.sub(r'^```$', '`````', skeleton, flags=re.M)
-        raw = {
-            '实际需求或补充原文': '用户输入中的 {{@示例}}\n```document-template\n# 示例\n```',
-            '用户决定原文': '批准S01/v1限定检查\n<!-- repeat -->\nTODO: 原始待办',
-            '实际确认原文': '尚未取得结果及归档确认；只读完成不等于允许提交。',
-        }
-
-        def value(match):
-            return next((text for hint, text in raw.items() if hint in match[0]), '隔离样例1')
-
-        document = check.PLACEHOLDER.sub(value, skeleton)
+        raw = '批准S01/v1限定检查\n{{@原始示例}}\n```document-template\n# 原文\n```\n<!-- repeat -->'
+        document = check.PLACEHOLDER.sub(
+            lambda m: raw if '实际需求或决定原文' in m[0] else '隔离样例1', skeleton)
         document = re.sub(r' <!-- repeat(?:-required)? -->', '', document)
-        self.assertEqual([], check.validate(document, source, 'record'))
-        for text in raw.values():
-            self.assertIn(text, document)
-        self.assertLess(document.index('#### 操作方案'), document.index('#### 审批记录'))
-        self.assertLess(document.index('#### 审批记录'), document.index('#### 执行与验证'))
-        self.assertLess(document.index('#### 执行与验证'), document.index('#### 阶段结论'))
-        for missing in ['- 待批准事项：隔离样例1\n', '- 实际动作与授权：隔离样例1\n',
-                        '- 决定来源与效力：隔离样例1\n', '- 验证与证据：隔离样例1\n']:
-            self.assertTrue(check.validate(document.replace(missing, '', 1), source, 'record'))
+        self.assertEqual([], check.validate(document, source, 'execution'))
+        self.assertIn(raw, document)
+        for field in ['- 来源与范围：隔离样例1\n', '- 方案与授权：隔离样例1\n',
+                      '- 执行结果：隔离样例1\n', '- 关键证据：隔离样例1\n']:
+            self.assertTrue(check.validate(document.replace(field, '', 1), source, 'execution'))
 
-    def test_operation_record_repeats_whole_stages_and_rejects_detached_approval(self):
+    def test_operation_versions_and_units_repeat_without_detaching_decisions(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
-        document = filled(check.template_blocks(source)['record'])
-        begin = document.index('### 阶段：')
-        end = document.index('## 4. 最终结果与归档')
-        stage = document[begin:end]
-        first = stage.replace('### 阶段：样例1', '### 阶段：S01 检查 v1', 1)
-        second = stage.replace('### 阶段：样例1', '### 阶段：S02 变更 v1', 1)
-        combined = document[:begin] + first + second + document[end:]
-        self.assertEqual([], check.validate(combined, source, 'record'))
-        a, b = second.index('#### 审批记录'), second.index('#### 执行与验证')
-        detached = document[:begin] + first + second[:a] + second[b:] + document[end:]
-        self.assertTrue(check.validate(detached, source, 'record'))
-        duplicated = document[:begin] + first + first + document[end:]
-        self.assertTrue(check.validate(duplicated, source, 'record'))
-        reordered = combined.replace('- 时间与退出状态：样例1\n- 文件处理与差异：样例1',
-                                     '- 文件处理与差异：样例1\n- 时间与退出状态：样例1', 1)
-        self.assertTrue(check.validate(reordered, source, 'record'))
+        for block, marker, finish, fields in [
+            ('record', '### 方案：', '## 3. 验收与归档', ('前提与范围', '变更与步骤')),
+            ('execution', '### 操作：', '## 3. 需求与决定来源', ('命令与参数', '执行结果')),
+        ]:
+            with self.subTest(block=block):
+                document = filled(check.template_blocks(source)[block])
+                begin, end = document.index(marker), document.index(finish)
+                unit = document[begin:end]
+                first = unit.replace(marker + '样例1', marker + 'S01/v1', 1)
+                second = unit.replace(marker + '样例1', marker + 'S01/v2', 1)
+                combined = document[:begin] + first + second + document[end:]
+                self.assertEqual([], check.validate(combined, source, block))
+                duplicated = document[:begin] + first + first + document[end:]
+                self.assertTrue(check.validate(duplicated, source, block))
+                a, b = fields
+                reordered = combined.replace(f'- {a}：样例1\n- {b}：样例1',
+                                             f'- {b}：样例1\n- {a}：样例1', 1)
+                self.assertTrue(check.validate(reordered, source, block))
+                required = '人工决定' if block == 'record' else '方案与授权'
+                detached = document[:begin] + first + second.replace(f'- {required}：样例1\n', '', 1) + document[end:]
+                self.assertTrue(check.validate(detached, source, block))
 
-    def test_operation_record_unexecuted_stages_keep_the_same_structure(self):
+    def test_operation_without_execution_keeps_unknown_and_rejected_states(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
-        document = filled(check.template_blocks(source)['record'])
-        begin = document.index('##### 动作：')
-        end = document.index('#### 阶段结论')
-        for state, decision in [('待批准', '未取得批准：尚未答复'),
-                                ('取消', '拒绝本版方案'),
-                                ('未知', '权限不可用，未授权后续动作')]:
+        blocks = check.template_blocks(source)
+        evidence = filled(blocks['execution'])
+        begin = evidence.index('### 操作：')
+        end = evidence.index('## 3. 需求与决定来源')
+        absence = '条目情况：无：未执行，等待明确批准或补齐权限。\n\n'
+        for state in ['待批准', '拒绝本版方案', '未知：权限不可用']:
             with self.subTest(state=state):
-                pending = document[:begin] + '条目情况：无：本阶段未执行，等待明确批准或补齐权限。\n\n' + document[end:]
-                pending = pending.replace('- 阶段状态：样例1', '- 阶段状态：' + state, 1)
-                approval = pending.index('##### 审批：')
-                head, tail = pending[:approval], pending[approval:]
-                pending = head + tail.replace('```text\n样例1\n```', '```text\n' + decision + '\n```', 1)
-                self.assertEqual([], check.validate(pending, source, 'record'))
-                omitted = pending.replace('条目情况：无：本阶段未执行，等待明确批准或补齐权限。\n\n', '')
-                self.assertTrue(check.validate(omitted, source, 'record'))
+                review = filled(blocks['record']).replace('- 人工决定：样例1', '- 人工决定：' + state)
+                review = review.replace('- 结果与证据：样例1', '- 结果与证据：未执行；缺批准或必要权限。')
+                pending = evidence[:begin] + absence + evidence[end:]
+                pending = pending.replace('```text\n样例1\n```', '```text\n' + state + '\n```', 1)
+                self.assertEqual([], check.validate(review, source, 'record'))
+                self.assertEqual([], check.validate(pending, source, 'execution'))
+                self.assertTrue(check.validate(pending.replace(absence, ''), source, 'execution'))
+
+    def test_operation_failure_and_recovery_fit_existing_evidence_slots(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        blocks = check.template_blocks(source)
+        # Isolated syntax examples: no server commands are executed by this test.
+        for result, evidence, recovery in [
+            ('样例时点查询退出0；只读，无服务器变更。', '挂载读取返回只读属性；业务未检查。', '无变更，无需回退。'),
+            ('样例时点实施退出0，随后验证退出1；部分完成。', '挂载存在，但健康检查失败。', '已停止后续动作；回退未执行，当前状态待核实。'),
+            ('样例时点实施退出1，获批回退退出0。', '回读恢复原配置；业务未验证。', '配置已恢复；业务验收仍未通过。'),
+        ]:
+            with self.subTest(result=result):
+                review = filled(blocks['record']).replace('- 当前结论：样例1', '- 当前结论：' + result)
+                review = review.replace('- 结果与证据：样例1', '- 结果与证据：' + recovery + ' 见execution.md对应操作。')
+                detail = filled(blocks['execution'])
+                detail = detail.replace('- 命令与参数：样例1', '- 命令与参数：隔离语法样例，不实际执行。\n\n  ```sh\n  docker service inspect demo_portal\n  ```')
+                detail = detail.replace('- 执行结果：样例1', '- 执行结果：' + result)
+                detail = detail.replace('- 关键证据：样例1', '- 关键证据：' + evidence)
+                detail = detail.replace('- 异常与后续：样例1', '- 异常与后续：' + recovery)
+                self.assertEqual([], check.validate(review, source, 'record'))
+                self.assertEqual([], check.validate(detail, source, 'execution'))
+                self.assertTrue(check.validate(detail.replace('- 异常与后续：' + recovery, ''), source, 'execution'))
 
     def test_formal_code_review_reports_have_an_authoritative_contract(self):
         source = (ROOT / 'code-review/references/report-template.md').read_text()
@@ -849,6 +868,7 @@ class FixedDocumentTests(unittest.TestCase):
             ('operation-workflow/references/output-templates.md', 'index'),
             ('operation-workflow/references/output-templates.md', 'unit'),
             ('operation-workflow/references/output-templates.md', 'record'),
+            ('operation-workflow/references/output-templates.md', 'execution'),
             ('development-workflow/references/output-template.md', 'document'),
             ('requirement-doc-authoring/references/requirement-template.md', 'document'),
             ('skill-authoring-standard/references/skill-template.md', 'document'),
