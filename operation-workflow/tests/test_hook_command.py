@@ -94,6 +94,18 @@ class HookTests(unittest.TestCase):
         report = hook.evaluate(self.event(self.docker+"--debug service inspect redis"), self.project)
         self.assertEqual("deny", report["decision"])
 
+    def test_executable_paths_and_wrappers_cannot_enter_ordinary_confirmation(self):
+        for command in ["/bin/rm -rf /", "./rm -rf /"]:
+            self.assertEqual("deny", hook.evaluate(self.event(command), self.project)["decision"])
+        self.policy["scenarios"] = [{"name": "all", "prefix": "", "default": "allow", "ask": []}]
+        self.save()
+        for command in ["builtin eval id", self.docker+"exec example sh -c id",
+                        self.docker+"container --debug exec example /bin/rm -rf /"]:
+            report = hook.evaluate(self.event(command), self.project)
+            self.assertEqual("stop", report["decision"])
+            self.assertEqual("wrapped-command", report["reason"])
+            self.assertEqual(2, hook.host_response(report, "codex")[2])
+
 
     def test_ssh_address_user_and_port_are_bound_to_inventory(self):
         for prefix in [self.prefix[:-1]+["operator@192.0.2.11"], self.prefix[:-1]+["root@192.0.2.10"],

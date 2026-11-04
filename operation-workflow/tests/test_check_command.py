@@ -383,6 +383,59 @@ class CommandTests(unittest.TestCase):
             self.assertEqual('allow', self.decision(command)['decision'])
         self.assertEqual('ask', self.decision('probe a --ready extra')['decision'])
 
+    def test_executable_paths_cannot_bypass_restrictions_in_either_format(self):
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy):
+                if legacy:
+                    self.legacy(deny=['dd **', 'rm -rf /'], ask=['systemctl restart **'], allow=['**'])
+                else:
+                    self.policy['deny'].append('dd **')
+                    self.policy['scenarios'] = [{'name': 'all', 'prefix': '', 'default': 'allow',
+                                                 'ask': ['systemctl restart **']}]
+                for program in ['dd', '/bin/dd', '/usr/bin/dd', './dd', '/tmp/dd']:
+                    self.assertEqual('deny', self.decision(program+' if=/dev/zero of=/dev/null')['decision'])
+                for program in ['rm', '/bin/rm', '/usr/bin/rm', './rm']:
+                    self.assertEqual('deny', self.decision(program+' -rf /')['decision'])
+                for program in ['systemctl', '/bin/systemctl', './systemctl']:
+                    self.assertEqual('ask', self.decision(program+' restart nginx.service')['decision'])
+
+    def test_path_rules_do_not_trust_basename_or_rewrite_operands(self):
+        self.legacy(deny=['/bin/dd **', 'probe /bin/dd'], ask=[], allow=['id', '/usr/bin/id'])
+        self.assertEqual('deny', self.decision('/bin/dd operand')['decision'])
+        self.assertEqual('ask', self.decision('/other/dd operand')['decision'])
+        self.assertEqual('deny', self.decision('probe /bin/dd')['decision'])
+        self.assertEqual('ask', self.decision('probe dd')['decision'])
+        for command, expected in [('id', 'allow'), ('/usr/bin/id', 'allow'), ('/tmp/id', 'ask')]:
+            self.assertEqual(expected, self.decision(command)['decision'])
+
+    def test_docker_normalized_denies_also_cover_pathless_program_rules(self):
+        self.policy['deny'] = ['docker -Hunix:///var/run/docker.sock service inspect **']
+        for command in ['docker', '/usr/bin/docker', './docker']:
+            result = self.decision(command+' --debug --host=unix:///var/run/docker.sock service inspect portal')
+            self.assertEqual('deny', result['decision'])
+
+    def test_command_wrappers_cannot_be_allowed_by_broad_policies(self):
+        base = deepcopy(self.policy)
+        for legacy in (False, True):
+            self.policy = deepcopy(base)
+            if legacy:
+                self.legacy(allow=['**'])
+            else:
+                self.policy['scenarios'] = [{'name': 'all', 'prefix': '', 'default': 'allow', 'ask': []}]
+            for command in ['builtin eval id', 'builtin exec /bin/rm -rf /',
+                            DOCKER+'exec example sh -c id', DOCKER+'container exec example sh -c id',
+                            'docker --debug -Hunix:///var/run/docker.sock container --log-level=error exec example id',
+                            '/usr/bin/docker --host=unix:///var/run/docker.sock exec example /bin/rm -rf /',
+                            DOCKER+'run example sh -c id', DOCKER+'container run example id']:
+                with self.subTest(legacy=legacy, command=command):
+                    result = self.decision(command)
+                    self.assertEqual(('ask', 'wrapped-command'), (result['decision'], result['reason']))
+            for command in [DOCKER+'inspect exec', DOCKER+'container inspect run', 'probe builtin eval']:
+                self.assertEqual('allow', self.decision(command)['decision'])
+            self.policy['deny'] = [DOCKER+'exec **', 'builtin **']
+            self.assertEqual('deny', self.decision(DOCKER+'exec example sh -c id')['decision'])
+            self.assertEqual('deny', self.decision('builtin eval id')['decision'])
+
     def test_path_globs_do_not_claim_filesystem_confinement(self):
         self.legacy(allow=['probe /opt/app/*'])
         for command in ['probe /opt/app/nested/file', 'probe /opt/app/../secret']:

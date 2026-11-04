@@ -17,7 +17,7 @@ WRAPPERS = {
     "ssh", "scp", "sftp", "sudo", "doas", "su", "env", "sh", "bash", "dash",
     "zsh", "fish", "busybox", "perl", "ruby", "node", "awk", "gawk", "mawk",
     "sed", "xargs", "find", "timeout", "nice", "nohup", "watch", "eval", "exec",
-    "command", "source", ".",
+    "command", "builtin", "source", ".",
 }
 DOCKER_BOOLEAN_FLAGS = {"--debug", "--tls", "--tlsverify", "--help", "--version"}
 DOCKER_VALUE_FLAGS = {
@@ -176,6 +176,39 @@ def matches(pattern, argv, alternatives=False):
     return row[-1]
 
 
+def restriction_matches(pattern, argv, alternatives=False):
+    """Pathless restrictions cover that executable name at any path.
+
+    Only argv[0] is adapted, and only for deny/ask rules. An explicitly pathed
+    rule keeps its path constraint; allow rules never inherit basename trust.
+    """
+    if matches(pattern, argv, alternatives):
+        return True
+    if not argv or not pattern or "/" not in argv[0]:
+        return False
+    options = choices(pattern[0]) if alternatives else [pattern[0]]
+    return any(
+        "/" not in option and matches([option] + pattern[1:], [Path(argv[0]).name] + argv[1:], alternatives)
+        for option in options
+    )
+
+
+def docker_wraps_command(argv):
+    """Inspect the canonical verb position, never object names or exec payloads."""
+    if Path(argv[0]).name != "docker":
+        return False
+    def verb_at(index):
+        while index < len(argv) and argv[index].startswith("-"):
+            option = argv[index].split("=", 1)[0]
+            index += 2 if option in DOCKER_VALUE_FLAGS else 1
+        return index
+
+    index = verb_at(1)
+    if index < len(argv) and argv[index] == "container":
+        index = verb_at(index + 1)
+    return index < len(argv) and argv[index] in {"exec", "run"}
+
+
 def has_shell_expansion(command):
     """Keep quoted literal formats usable; do not guess unquoted expansions."""
     quote = None
@@ -280,30 +313,29 @@ def classify(policy, server_id, user, command):
     except ValueError:
         return dict(report, reason="unsupported-shell")
     scoped = "scenarios" in rules
-    for category in (("deny",) if scoped else ("deny", "ask")):
-        for pattern, parsed in rules[category]:
-            if matches(parsed, argv, alternatives=scoped):
-                return dict(report, decision=category, reason=category + "-pattern", pattern=pattern)
+    for pattern, parsed in rules["deny"]:
+        if restriction_matches(parsed, argv, alternatives=scoped):
+            return dict(report, decision="deny", reason="deny-pattern", pattern=pattern)
     # Static argv matching cannot resolve shell pathname expansion safely.
     if has_shell_expansion(command):
         return dict(report, reason="shell-expansion")
+    try:
+        normalized = docker_arguments(argv)
+    except ValueError:
+        return dict(report, reason="unsupported-docker-options")
+    if scoped:
+        for pattern, parsed in rules["normalized_deny"]:
+            if restriction_matches(parsed, normalized, alternatives=True):
+                return dict(report, decision="deny", reason="deny-pattern", pattern=pattern)
     executable = Path(argv[0]).name
     if (
         executable in WRAPPERS or "=" in argv[0]
         or re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", executable)
         or executable.endswith((".sh", ".py", ".pl", ".rb", ".js"))
+        or docker_wraps_command(normalized)
     ):
         return dict(report, reason="wrapped-command")
     if scoped:
-        try:
-            normalized = docker_arguments(argv)
-        except ValueError:
-            return dict(report, reason="unsupported-docker-options")
-        # Always compare canonical pairs, even when the command was already
-        # canonical but its deny pattern used a short/equal-sign spelling.
-        for pattern, parsed in rules["normalized_deny"]:
-            if matches(parsed, normalized, alternatives=True):
-                return dict(report, decision="deny", reason="deny-pattern", pattern=pattern)
         argv = normalized
         candidates = [scenario for scenario in rules["scenarios"]
                       if argv[:len(scenario["prefix"])] == scenario["prefix"]]
@@ -314,12 +346,16 @@ def classify(policy, server_id, user, command):
         suffix = argv[len(scenario["prefix"]):]
         decision, reason, pattern = scenario["default"], "scenario-default", None
         for candidate, parsed in scenario["rules"]:
-            if matches(parsed, suffix, alternatives=True):
+            match = restriction_matches if scenario["exception"] == "ask" and not scenario["prefix"] else matches
+            if match(parsed, suffix, alternatives=True):
                 decision, reason, pattern = scenario["exception"], "scenario-exception", candidate
                 break
         if decision == "allow" and not policy["approval_ref"]:
             return dict(report, reason="unapproved-policy", pattern=pattern)
         return dict(report, decision=decision, reason=reason, pattern=pattern)
+    for pattern, parsed in rules["ask"]:
+        if restriction_matches(parsed, argv):
+            return dict(report, reason="ask-pattern", pattern=pattern)
     for pattern, parsed in rules["allow"]:
         if matches(parsed, argv):
             reason = "allow-pattern" if policy["approval_ref"] else "unapproved-policy"
