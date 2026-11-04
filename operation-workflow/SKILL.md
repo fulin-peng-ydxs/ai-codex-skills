@@ -49,6 +49,6 @@ description: 初始化运维工作空间、接入服务器、盘点服务，按�
 
 失败/取消保留证据，未完成审批或提交不称完整闭环；未做业务检查不称业务验收通过。
 
-交付前先只读 `record.md`，确认能判断改什么、影响什么、是否批准、结果和下一步；再沿方案编号到 `execution.md` 核对命令、批准来源与实际证据。检查未执行和失败没有冒充成功，附件都有实际用途。归档须通过 `python3 <技能目录>/scripts/check_archive.py index --repo <仓库根> --operations-root <仓库相对运维目录>`；它仅检查索引路径、类型和大小，不能替代敏感信息、授权或远端结果核实。
+交付前按模板的审阅路径走读：先从 `record.md` 顶部找到当前决定和异常，定位具体方案版本；只读该方案即可判断改动、影响、保障及是否批准。再沿操作链接到 `execution.md` 核对命令、预期与实际、证据及真实批准来源，并能反向回到方案；归档状态分别核对，不以执行批准代替结果确认或提交批准。检查未执行和失败没有冒充成功，附件都有实际用途。归档须通过 `python3 <技能目录>/scripts/check_archive.py index --repo <仓库根> --operations-root <仓库相对运维目录>`；它仅检查索引路径、类型和大小，不能替代敏感信息、授权或远端结果核实。
 
 完整生成或整体重构运维产物后运行 `python3 <skills-root>/skill-authoring-standard/scripts/validate_document_template.py <产物路径> --template <本技能目录>/references/output-templates.md --block <实际产物块>`；格式检查不能代替授权、内容及实际运行结果核实。

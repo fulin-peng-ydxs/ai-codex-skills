@@ -613,8 +613,9 @@ class FixedDocumentTests(unittest.TestCase):
         blocks = check.template_blocks(source)
         self.assertEqual({'access', 'index', 'unit', 'record', 'execution'}, set(blocks))
         review = filled(blocks['record'])
-        for field in ['- 待办与决定：样例1\n', '- 人工决定：样例1\n',
-                      '- 影响与保障：样例1\n', '- 结果与证据：样例1\n']:
+        for field in ['- 待办与决定：样例1\n', '- 异常与未验证：样例1\n', '- 人工决定：样例1\n',
+                      '- 影响：样例1\n', '- 备份与回退：样例1\n', '- 验证标准：样例1\n',
+                      '- 结果与证据：样例1\n']:
             self.assertTrue(check.validate(review.replace(field, '', 1), source, 'record'))
         # Raw input can contain template-like text without changing the contract.
         skeleton = blocks['execution'].replace('```text verbatim', '`````text')
@@ -630,6 +631,7 @@ class FixedDocumentTests(unittest.TestCase):
             self.assertTrue(check.validate(document.replace(field, '', 1), source, 'execution'))
 
     def test_operation_versions_and_units_repeat_without_detaching_decisions(self):
+        # Structural repetition only; this does not prove navigation or source semantics.
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         for block, marker, finish, fields in [
             ('record', '### 方案：', '## 3. 验收与归档', ('前提与范围', '变更与步骤')),
@@ -653,6 +655,34 @@ class FixedDocumentTests(unittest.TestCase):
                 detached = document[:begin] + first + second.replace(f'- {required}：样例1\n', '', 1) + document[end:]
                 self.assertTrue(check.validate(detached, source, block))
 
+    def test_operation_review_tables_preserve_navigation_and_separate_archive_states(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        blocks = check.template_blocks(source)
+        for block, header in [
+            ('record', '| 方案版本与详情 | 整体批准 | 执行与验证 | 操作入口 |'),
+            ('record', '| 事项 | 当前状态与范围 | 来源或证据 |'),
+            ('execution', '| 核对项 | 预期 | 实际与判定 | 证据入口 |'),
+        ]:
+            with self.subTest(block=block, header=header):
+                document = filled(blocks[block])
+                self.assertEqual([], check.validate(document, source, block))
+                self.assertIn(header, document)
+                begin = document.index(header)
+                end = document.find('\n\n', begin)
+                if end == -1:
+                    end = len(document)
+                self.assertTrue(check.validate(document[:begin] + document[end:], source, block))
+                self.assertTrue(check.validate(document.replace(header, header.replace(' |', '', 1)), source, block))
+        review = filled(blocks['record'])
+        for item in ['结果确认', '归档批准', '索引检查', '本地提交', '推送']:
+            with self.subTest(item=item):
+                row = f'| {item} | 样例1 | 样例1 |\n'
+                self.assertIn(row, review)
+                self.assertTrue(check.validate(review.replace(row, ''), source, 'record'))
+        detail = filled(blocks['execution'])
+        self.assertTrue(check.validate(detail.replace('| 样例1 | 样例1 | 样例1 | 样例1 |',
+                                                     '| 样例1 | 样例1 | | 样例1 |'), source, 'execution'))
+
     def test_operation_without_execution_keeps_unknown_and_rejected_states(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         blocks = check.template_blocks(source)
@@ -671,14 +701,73 @@ class FixedDocumentTests(unittest.TestCase):
                 self.assertEqual([], check.validate(pending, source, 'execution'))
                 self.assertTrue(check.validate(pending.replace(absence, ''), source, 'execution'))
 
+    def test_operation_candidate_commands_fit_without_claiming_approval_or_execution(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        blocks = check.template_blocks(source)
+        review = filled(blocks['record'])
+        detail = filled(blocks['execution'])
+        fields = {
+            '用途与归属': '隔离试填的人工审阅入口，明细见[O01](execution.md#操作o01)；不代表真实服务器任务。',
+            '目标与验收': '测试服务demo_portal从1副本扩至2副本；期望与运行均为2，业务健康另行检查。',
+            '当前结论': '待执行；目前没有服务器变更。',
+            '异常与未验证': '运行副本数及业务均未验证，尚不能判断目标达成。',
+            '待办与决定': '请决定是否批准[S01/v1](#方案s01v1)；批准后方可执行O01。',
+            '前提与范围': '仅测试服务demo_portal，样例原副本数1；不改镜像和持久化数据。',
+            '变更与步骤': '副本数1→2；先核对原值，再按[O01](execution.md#操作o01)更新并检查运行数。',
+            '影响': '新增一个服务副本，增加资源占用；不修改其他服务。',
+            '备份与回退': '保留原副本数1；无数据文件变更。验证失败停止后续动作，仅在身份和基线符合时按O01候选回退恢复1。',
+            '验证标准': 'O01需核对运行数2/2；业务健康未纳入本轮，不据此宣布业务验收。',
+            '人工决定': '待批准；只有[R01](execution.md#来源r01)需求，尚无批准来源。',
+            '结果与证据': '未执行，等待S01/v1整体批准；[O01](execution.md#操作o01)仅是候选。',
+            '验收与剩余问题': '副本数未验证，业务未检查；先等待方案决定。',
+            '文档与提交范围': '仅本试填的record.md与execution.md；没有实际暂存或提交，不纳入真实项目。',
+        }
+        for field, value in fields.items():
+            review = review.replace(f'- {field}：样例1', f'- {field}：{value}')
+        review = review.replace('### 方案：样例1', '### 方案：S01/v1')
+        review = review.replace('| 样例1 | 样例1 | 样例1 | 样例1 |',
+                                '| [S01/v1](#方案s01v1) | 待批准 | 未执行 | [O01](execution.md#操作o01) |')
+        for item in ['结果确认', '归档批准', '索引检查', '本地提交', '推送']:
+            review = review.replace(f'| {item} | 样例1 | 样例1 |',
+                                    f'| {item} | 未执行：方案尚待批准 | 无：没有实际决定或执行证据 |')
+        fields = {
+            '用途与归属': '隔离试填明细，人工决定见[S01/v1](record.md#方案s01v1)，不连接真实服务器。',
+            '目标与身份': '模拟测试服务demo_portal；身份和提权仅为候选，执行前必须核实。',
+            '连接与核验': '未连接；本测试只验证文档结构，不产生连接授权。',
+            '策略依据': '模拟策略将候选命令判为allow，仅免逐条询问，整体变更仍待批准。',
+            '方案与授权': '[S01/v1](record.md#方案s01v1)待批准；[R01](#来源r01)仅为需求，不能执行。',
+            '命令与参数': '候选；先查询副本数确认为1，再更新为2并回读。失败停止；满足获批回退条件时恢复1。\n\n'
+                         '  ```sh\n  docker service ls --filter name=demo_portal --format \'{{.Replicas}}\'\n'
+                         '  docker service update --replicas 2 demo_portal\n'
+                         '  docker service ls --filter name=demo_portal --format \'{{.Replicas}}\'\n  ```\n'
+                         '  条件回退候选：`docker service update --replicas 1 demo_portal`，随后按上述查询核实1/1。',
+            '执行结果': '未执行：整体方案尚待批准，无执行时点和退出码。',
+            '关键证据': '无：未执行，没有运行输出。',
+            '异常与后续': '批准及身份核验完成前保持未执行，不因命令allow直接变更。',
+            '来源与范围': '隔离模拟用户需求R01，仅提出扩容目标，不批准方案。',
+        }
+        for field, value in fields.items():
+            detail = detail.replace(f'- {field}：样例1', f'- {field}：{value}')
+        detail = detail.replace('### 操作：样例1', '### 操作：O01').replace('### 来源：样例1', '### 来源：R01')
+        detail = detail.replace('| 样例1 | 样例1 | 样例1 | 样例1 |',
+                                '| 副本数 | 更新后2/2，回退后1/1 | 未执行，无法判定 | 无：待整体批准后取证 |')
+        detail = detail.replace('```text\n样例1\n```', '```text\n隔离模拟需求：把测试服务从1副本扩至2副本。\n```')
+        for block, document in [('record', review), ('execution', detail)]:
+            with self.subTest(block=block):
+                self.assertNotIn('样例1', document)
+                self.assertEqual([], check.validate(document, source, block))
+
     def test_operation_failure_and_recovery_fit_existing_evidence_slots(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         blocks = check.template_blocks(source)
         # Isolated syntax examples: no server commands are executed by this test.
-        for result, evidence, recovery in [
-            ('样例时点查询退出0；只读，无服务器变更。', '挂载读取返回只读属性；业务未检查。', '无变更，无需回退。'),
-            ('样例时点实施退出0，随后验证退出1；部分完成。', '挂载存在，但健康检查失败。', '已停止后续动作；回退未执行，当前状态待核实。'),
-            ('样例时点实施退出1，获批回退退出0。', '回读恢复原配置；业务未验证。', '配置已恢复；业务验收仍未通过。'),
+        for result, evidence, recovery, mount, health, restored in [
+            ('样例时点查询退出0；只读，无服务器变更。', '挂载读取返回RW=false；业务未检查。', '无变更，无需回退。',
+             '通过：RW=false', '未验证：本次未作健康检查', '不适用：只读无变更'),
+            ('样例时点实施退出0，随后验证退出1；部分完成。', '挂载RW=false；健康检查退出1。', '已停止后续动作；回退未执行，当前状态待核实。',
+             '通过：RW=false', '失败：健康检查退出1', '未知：回退未执行'),
+            ('样例时点实施退出1，获批回退退出0。', '回读恢复原配置；业务未验证。', '配置已恢复；业务验收仍未通过。',
+             '未知：中途失败，未完成挂载核验', '未验证：未作业务检查', '通过：配置回读与原基线一致'),
         ]:
             with self.subTest(result=result):
                 review = filled(blocks['record']).replace('- 当前结论：样例1', '- 当前结论：' + result)
@@ -688,6 +777,10 @@ class FixedDocumentTests(unittest.TestCase):
                 detail = detail.replace('- 执行结果：样例1', '- 执行结果：' + result)
                 detail = detail.replace('- 关键证据：样例1', '- 关键证据：' + evidence)
                 detail = detail.replace('- 异常与后续：样例1', '- 异常与后续：' + recovery)
+                detail = detail.replace('| 样例1 | 样例1 | 样例1 | 样例1 |',
+                                        '| 挂载 | RW=false | ' + mount + ' | 见本操作关键证据 |\n'
+                                        '| 健康 | 健康检查通过 | ' + health + ' | 见本操作关键证据 |\n'
+                                        '| 恢复 | 回到变更前基线 | ' + restored + ' | 见本操作关键证据 |')
                 self.assertEqual([], check.validate(review, source, 'record'))
                 self.assertEqual([], check.validate(detail, source, 'execution'))
                 self.assertTrue(check.validate(detail.replace('- 异常与后续：' + recovery, ''), source, 'execution'))
