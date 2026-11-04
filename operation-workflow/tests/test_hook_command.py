@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -11,6 +12,8 @@ import threading
 import tomllib
 import unittest
 from unittest.mock import patch
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -56,6 +59,38 @@ class HookTests(unittest.TestCase):
                                  ("rm -rf /", "deny")]:
             with self.subTest(command=remote):
                 self.assertEqual(decision, hook.evaluate(self.event(remote), self.project)["decision"])
+
+    def test_workspace_inventory_example_is_directly_consumable(self):
+        workspace = (ROOT/'references/workspace.md').read_text()
+        example = re.search(r'```yaml\n(.*?)\n```', workspace, re.DOTALL)
+        self.assertIsNotNone(example, 'workspace must supply its inventory example')
+        self.servers = yaml.safe_load(example.group(1))
+        row = self.servers['servers'][0]
+        self.policy['targets'] = [{'server_id': row['server_id'], 'user': row['username']}]
+        self.save()
+        prefix = [*self.prefix[:-1], '-p', str(row['port']), row['username']+'@'+row['address']]
+        self.assertEqual('allow', hook.evaluate(self.event(prefix=prefix), self.project)['decision'])
+        # Optional inventory metadata must not change the concrete target.
+        row.update(environment='test', purpose='isolated documentation fixture')
+        self.save()
+        self.assertEqual('allow', hook.evaluate(self.event(prefix=prefix), self.project)['decision'])
+
+    def test_inventory_missing_fields_wrong_port_type_and_ambiguity_stop(self):
+        mutations = [
+            lambda rows: rows[0].update(user=rows[0].pop('username')),
+            lambda rows: rows[0].pop('connection_method'),
+            lambda rows: rows[0].update(port='22'),
+            lambda rows: rows.append(dict(rows[0])),
+        ]
+        baseline = json.loads(json.dumps(self.servers))
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                self.servers = json.loads(json.dumps(baseline))
+                mutate(self.servers['servers'])
+                self.save()
+                report = hook.evaluate(self.event(), self.project)
+                self.assertEqual('stop', report['decision'])
+                self.assertEqual('invalid-or-uncovered-target', report['reason'])
 
 
     def test_no_product_adapter_forwards_deny_exit_three(self):
