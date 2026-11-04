@@ -701,7 +701,7 @@ class FixedDocumentTests(unittest.TestCase):
                 self.assertEqual([], check.validate(pending, source, 'execution'))
                 self.assertTrue(check.validate(pending.replace(absence, ''), source, 'execution'))
 
-    def test_operation_candidate_commands_fit_without_claiming_approval_or_execution(self):
+    def test_operation_plan_does_not_require_a_precomputed_command_list(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
         blocks = check.template_blocks(source)
         review = filled(blocks['record'])
@@ -715,10 +715,10 @@ class FixedDocumentTests(unittest.TestCase):
             '前提与范围': '仅测试服务demo_portal，样例原副本数1；不改镜像和持久化数据。',
             '变更与步骤': '副本数1→2；先核对原值，再按[O01](execution.md#操作o01)更新并检查运行数。',
             '影响': '新增一个服务副本，增加资源占用；不修改其他服务。',
-            '备份与回退': '保留原副本数1；无数据文件变更。验证失败停止后续动作，仅在身份和基线符合时按O01候选回退恢复1。',
+            '备份与回退': '保留原副本数1；无数据文件变更。验证失败停止后续动作，仅在身份和基线符合时按O01所列恢复目标回退至1。',
             '验证标准': 'O01需核对运行数2/2；业务健康未纳入本轮，不据此宣布业务验收。',
             '人工决定': '待批准；只有[R01](execution.md#来源r01)需求，尚无批准来源。',
-            '结果与证据': '未执行，等待S01/v1整体批准；[O01](execution.md#操作o01)仅是候选。',
+            '结果与证据': '未执行，等待S01/v1整体批准；[O01](execution.md#操作o01)仅记录待执行范围和预期。',
             '验收与剩余问题': '副本数未验证，业务未检查；先等待方案决定。',
             '文档与提交范围': '仅本试填的record.md与execution.md；没有实际暂存或提交，不纳入真实项目。',
         }
@@ -736,11 +736,7 @@ class FixedDocumentTests(unittest.TestCase):
             '连接与核验': '未连接；本测试只验证文档结构，不产生连接授权。',
             '策略依据': '模拟策略将候选命令判为allow，仅免逐条询问，整体变更仍待批准。',
             '方案与授权': '[S01/v1](record.md#方案s01v1)待批准；[R01](#来源r01)仅为需求，不能执行。',
-            '命令与参数': '候选；先查询副本数确认为1，再更新为2并回读。失败停止；满足获批回退条件时恢复1。\n\n'
-                         '  ```sh\n  docker service ls --filter name=demo_portal --format \'{{.Replicas}}\'\n'
-                         '  docker service update --replicas 2 demo_portal\n'
-                         '  docker service ls --filter name=demo_portal --format \'{{.Replicas}}\'\n  ```\n'
-                         '  条件回退候选：`docker service update --replicas 1 demo_portal`，随后按上述查询核实1/1。',
+            '命令与参数': '尚未执行，无实际命令；具体命令在执行当次生成并判定权限，执行后汇总。',
             '执行结果': '未执行：整体方案尚待批准，无执行时点和退出码。',
             '关键证据': '无：未执行，没有运行输出。',
             '异常与后续': '批准及身份核验完成前保持未执行，不因命令allow直接变更。',
@@ -755,6 +751,7 @@ class FixedDocumentTests(unittest.TestCase):
         for block, document in [('record', review), ('execution', detail)]:
             with self.subTest(block=block):
                 self.assertNotIn('样例1', document)
+                self.assertNotIn('docker service update', document)
                 self.assertEqual([], check.validate(document, source, block))
 
     def test_operation_failure_and_recovery_fit_existing_evidence_slots(self):
