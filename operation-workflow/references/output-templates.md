@@ -6,8 +6,6 @@
 
 使用下方完整模板填充；标记语法及校验命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。本产物的具体填写要求见模板后的内容验收，通用生成与更新边界沿用上述全局规范。
 
-## 完整模板
-
 ## access 产物
 
 ````document-template access
