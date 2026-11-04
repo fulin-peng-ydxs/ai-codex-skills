@@ -593,20 +593,69 @@ class FixedDocumentTests(unittest.TestCase):
         snippet = '### 共用筛选状态\n- 现状与依据：已比较两处。\n- 判断与边界：复用已有入口。\n- 消费方与处理：迁移两处。\n- 验证与维护：安排回归。\n\n'
         self.assertTrue(check.validate(good.replace('## 3. 验收与交付', snippet + '## 3. 验收与交付'), source))
 
-    def test_operation_record_keeps_all_three_literal_sources(self):
+    def test_operation_record_keeps_demand_and_decisions_inside_one_contract(self):
         source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
-        skeleton = check.template_blocks(source)['record']
-        skeleton = skeleton.replace('```text verbatim', '`````text')
+        blocks = check.template_blocks(source)
+        self.assertEqual({'access', 'index', 'unit', 'record'}, set(blocks))
+        skeleton = blocks['record'].replace('```text verbatim', '`````text')
         skeleton = re.sub(r'^```$', '`````', skeleton, flags=re.M)
-        raw = ['用户输入中的 {{@示例}}\n```document-template\n# 示例\n```',
-               '批准原文\n<!-- repeat -->\nTODO: 原始待办',
-               '汇报原文\n## 内部标题\n{{@尚未完成的示例}}']
-        values = iter(['隔离需求来源及哈希', raw[0], '隔离批准来源及哈希', raw[1], '隔离汇报来源及哈希', raw[2]])
-        document = check.PLACEHOLDER.sub(lambda _: next(values), skeleton)
+        raw = {
+            '实际需求或补充原文': '用户输入中的 {{@示例}}\n```document-template\n# 示例\n```',
+            '用户决定原文': '批准S01/v1限定检查\n<!-- repeat -->\nTODO: 原始待办',
+            '实际确认原文': '尚未取得结果及归档确认；只读完成不等于允许提交。',
+        }
+
+        def value(match):
+            return next((text for hint, text in raw.items() if hint in match[0]), '隔离样例1')
+
+        document = check.PLACEHOLDER.sub(value, skeleton)
+        document = re.sub(r' <!-- repeat(?:-required)? -->', '', document)
         self.assertEqual([], check.validate(document, source, 'record'))
-        for text in raw:
+        for text in raw.values():
             self.assertIn(text, document)
-        self.assertNotIn('text verbatim', document)
+        self.assertLess(document.index('#### 操作方案'), document.index('#### 审批记录'))
+        self.assertLess(document.index('#### 审批记录'), document.index('#### 执行与验证'))
+        self.assertLess(document.index('#### 执行与验证'), document.index('#### 阶段结论'))
+        for missing in ['- 待批准事项：隔离样例1\n', '- 实际动作与授权：隔离样例1\n',
+                        '- 决定来源与效力：隔离样例1\n', '- 验证与证据：隔离样例1\n']:
+            self.assertTrue(check.validate(document.replace(missing, '', 1), source, 'record'))
+
+    def test_operation_record_repeats_whole_stages_and_rejects_detached_approval(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        document = filled(check.template_blocks(source)['record'])
+        begin = document.index('### 阶段：')
+        end = document.index('## 4. 最终结果与归档')
+        stage = document[begin:end]
+        first = stage.replace('### 阶段：样例1', '### 阶段：S01 检查 v1', 1)
+        second = stage.replace('### 阶段：样例1', '### 阶段：S02 变更 v1', 1)
+        combined = document[:begin] + first + second + document[end:]
+        self.assertEqual([], check.validate(combined, source, 'record'))
+        a, b = second.index('#### 审批记录'), second.index('#### 执行与验证')
+        detached = document[:begin] + first + second[:a] + second[b:] + document[end:]
+        self.assertTrue(check.validate(detached, source, 'record'))
+        duplicated = document[:begin] + first + first + document[end:]
+        self.assertTrue(check.validate(duplicated, source, 'record'))
+        reordered = combined.replace('- 时间与退出状态：样例1\n- 文件处理与差异：样例1',
+                                     '- 文件处理与差异：样例1\n- 时间与退出状态：样例1', 1)
+        self.assertTrue(check.validate(reordered, source, 'record'))
+
+    def test_operation_record_unexecuted_stages_keep_the_same_structure(self):
+        source = (ROOT / 'operation-workflow/references/output-templates.md').read_text()
+        document = filled(check.template_blocks(source)['record'])
+        begin = document.index('##### 动作：')
+        end = document.index('#### 阶段结论')
+        for state, decision in [('待批准', '未取得批准：尚未答复'),
+                                ('取消', '拒绝本版方案'),
+                                ('未知', '权限不可用，未授权后续动作')]:
+            with self.subTest(state=state):
+                pending = document[:begin] + '条目情况：无：本阶段未执行，等待明确批准或补齐权限。\n\n' + document[end:]
+                pending = pending.replace('- 阶段状态：样例1', '- 阶段状态：' + state, 1)
+                approval = pending.index('##### 审批：')
+                head, tail = pending[:approval], pending[approval:]
+                pending = head + tail.replace('```text\n样例1\n```', '```text\n' + decision + '\n```', 1)
+                self.assertEqual([], check.validate(pending, source, 'record'))
+                omitted = pending.replace('条目情况：无：本阶段未执行，等待明确批准或补齐权限。\n\n', '')
+                self.assertTrue(check.validate(omitted, source, 'record'))
 
     def test_formal_code_review_reports_have_an_authoritative_contract(self):
         source = (ROOT / 'code-review/references/report-template.md').read_text()
@@ -779,7 +828,7 @@ class FixedDocumentTests(unittest.TestCase):
         self.assertTrue(check.check_template(CONTRACT + '\n' + CONTRACT))
 
     def test_every_installed_template_is_consumable_and_rejects_new_sections(self):
-        count = 0
+        covered = set()
         for path in sorted(ROOT.glob('*/**/*.md')):
             if any(part.startswith('.') for part in path.relative_to(ROOT).parts):
                 continue
@@ -792,8 +841,19 @@ class FixedDocumentTests(unittest.TestCase):
                     text = filled(skeleton)
                     self.assertEqual([], check.validate(text, source, name), '\n'.join(check.validate(text, source, name)))
                     self.assertTrue(check.validate(text + '\n## 无授权新增章节\n额外内容\n', source, name))
-                    count += 1
-        self.assertGreaterEqual(count, 25)
+                    covered.add((path.relative_to(ROOT).as_posix(), name))
+        # Discover every template, but guard real consumers rather than an arbitrary
+        # total that would penalize retiring duplicate artifact contracts.
+        required_consumers = {
+            ('operation-workflow/references/output-templates.md', 'access'),
+            ('operation-workflow/references/output-templates.md', 'index'),
+            ('operation-workflow/references/output-templates.md', 'unit'),
+            ('operation-workflow/references/output-templates.md', 'record'),
+            ('development-workflow/references/output-template.md', 'document'),
+            ('requirement-doc-authoring/references/requirement-template.md', 'document'),
+            ('skill-authoring-standard/references/skill-template.md', 'document'),
+        }
+        self.assertTrue(required_consumers <= covered, required_consumers - covered)
 
     def test_existing_document_preserves_original_structure(self):
         existing = '# 原文\n\n## 既有安排\n保留原文细节和确认状态。\n'

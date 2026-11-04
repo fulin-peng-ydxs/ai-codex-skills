@@ -4,7 +4,7 @@
 
 ## 格式与匹配
 
-- `version`：正整数；`targets`：共享本组规则的精确 `{server_id, user}` 对；`approval_ref`：批准该版本的可信用户消息/记录引用，草案为 null。字段本身不证明授权，执行者须核实来源。
+- `version`：正整数；`targets`：共享本组规则的精确 `{server_id, user}` 对；`approval_ref`：批准该版本的可信用户消息或 `record.md` 对应阶段的批准引用，草案为 null。既有可信引用继续有效；字段本身不证明授权，执行者须核实来源。
 - `deny / ask / allow`：命令模式字符串数组；`default` 固定为 `ask`。先 deny，再 ask，再 allow；未匹配、目标不符、配置错误均 ask。禁止项不能被普通任务批准覆盖。
 - 命令和模式按 shell 引号解析为参数序列，逐参数匹配。`*`、`?`、`[abc]` 是单参数内通配符；独立 `**` 匹配零个或多个参数。`systemctl restart *.service` 不匹配额外参数；`docker service update **` 匹配其余参数。
 - 控制符/重定向、换行、变量/命令替换不自动 allow；SSH、sudo、解释器/脚本等包装未命中 deny/ask 时返回 ask。执行者展开内层动作再判定，任一 deny 即停止；脚本批准绑定内容/哈希。未加引号的路径/花括号/波浪号展开或注释转 ask；实际命令传具体对象，通配写在规则里，格式字符串可用引号保护。

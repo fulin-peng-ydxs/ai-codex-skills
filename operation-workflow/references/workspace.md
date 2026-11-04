@@ -25,7 +25,7 @@
 | `OPS_ROOT/index.md` | 按固定模板的 index 块 |
 | `OPS_ROOT/units/<unit-id>.md` | 按固定模板的 unit 块 |
 | `OPS_ROOT/servers/<server-id>/rootfs/` | 合规原件镜像；脱敏件/摘要显式改名，见留痕 |
-| `OPS_ROOT/records/<YYYYMMDDHHmm[-序号]>/` | 需求、方案、批准、动作、结果及文件映射，见留痕 |
+| `OPS_ROOT/records/<YYYYMMDDHHmm[-序号]>/record.md` | 唯一任务审阅入口，按统一阶段串起需求、方案、批准、动作、结果和归档；必要附件见留痕，不另建方案或报告 |
 
 server_id、unit-id 为唯一小写 kebab-case；前者不随 IP 改变，同名服务的不同环境/集群用不同单位 ID，跨主机集群用同一 unit-id 关联成员。
 
