@@ -100,7 +100,7 @@
 | 技能目录 | 简要功能说明 | 主要用途 | 使用注意事项 |
 | --- | --- | --- | --- |
 | `automation-management` | 配置、优化和排查 Codex 定时或自动化任务。 | 创建、更新、精简、验证和排查 Codex 自动化任务，包括提示词职责边界、权限、网络、Git push 和定时执行异常。 | 提示词只写差异化约束；网络、推送和持久授权必须保持明确且最小化。 |
-| `config-codex-sync` | 将 Codex 技能与协作说明对齐到 Claude 和 Kimi。 | 将 Codex 全局 skills 与协作说明同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步；Claude 目标文档为 `CLAUDE.md`、Kimi 目标文档为 `AGENTS.md`，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 | 必须先 `--dry-run`；运行时路径按目标环境适配，局部同步使用隔离临时源；默认增量保留，显式 `--delete` 仅清理符合管理清单或可信历史基线条件的受管内容，保留目标独有及已修改内容。 |
+| `config-codex-sync` | 将 Codex 技能与协作说明对齐到 Claude 和 Kimi。 | 将 Codex 全局 skills 与协作说明同步到 Claude Code、Kimi Code 的用户级目录，默认先预览再执行正式同步；Claude 目标文档为 `CLAUDE.md`、Kimi 目标文档为 `AGENTS.md`，保留目标端独有技能或文件，并显式排除所有 MCP 相关技能。 | 必须先 `--dry-run`；运行时路径按目标环境适配，按技能入口补齐实际引用的可移植系统依赖；局部同步使用隔离临时源；默认增量保留，显式 `--delete` 仅清理符合管理清单或可信历史基线条件的受管内容，保留目标独有及已修改内容。 |
 | `config-project-mcp-sync` | 注册、更新并验证当前项目的本地 MCP 服务。 | 将项目 `.mcp.json` 与 `.codex-mcp` 中声明的 MCP 启动参数同步到 Codex 本地注册信息，并做握手验证。 | 只处理项目真实声明的服务；实际同步后按请求做 JSON-RPC 握手；只检查用 `--dry-run`，只列出再加 `--no-validate`，避免泄露敏感配置。 |
 
 ### Git 协作

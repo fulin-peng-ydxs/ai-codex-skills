@@ -335,5 +335,112 @@ class ManagedRetirementTest(unittest.TestCase):
             self.assertFalse(conflicts)
             self.assertNotIn(name, retired)
 
+    def system_dependency(self, name='skill-creator'):
+        dependent = self.source / 'skills/keep/SKILL.md'
+        dependent.write_text(dependent.read_text() + f'\n[provider](../.system/{name}/SKILL.md#initialize)\n')
+        provider = self.skill(self.source, '.system/' + name)
+        entry = provider / 'SKILL.md'
+        entry.write_text(entry.read_text().replace(f'name: .system/{name}', f'name: {name}') + '\nDefault: `$CODEX_HOME/skills`, or `~/.codex/skills` when `CODEX_HOME` is unset.\n'
+                         'scripts/init_skill.py example --path "${CODEX_HOME:-$HOME/.codex}/skills"\n')
+        (provider / 'scripts').mkdir()
+        (provider / 'scripts/init_skill.py').write_text('print("initializer")\n')
+        return provider
+
+    def test_system_dependency_adapted_for_both_targets_without_source_changes(self):
+        provider = self.system_dependency()
+        source_before = SYNC_MODULE.tree_snapshot(self.source)
+        kimi = self.root / 'kimi target'
+        args = ('--target', 'all', '--kimi-root', str(kimi))
+        preview = self.run_sync(*args, '--dry-run')
+        self.assertIn('skill-creator', preview)
+        self.assertFalse(self.target.exists())
+        self.assertFalse(kimi.exists())
+        self.run_sync(*args)
+        for target in [self.target, kimi]:
+            dependent = target / 'skills/keep/SKILL.md'
+            self.assertIn('../skill-creator/SKILL.md#initialize', dependent.read_text())
+            self.assertTrue((dependent.parent / '../skill-creator/SKILL.md').is_file())
+            self.assertEqual((provider / 'scripts/init_skill.py').read_bytes(),
+                             (target / 'skills/skill-creator/scripts/init_skill.py').read_bytes())
+            content = (target / 'skills/skill-creator/SKILL.md').read_text()
+            self.assertNotIn('CODEX_HOME', content)
+            self.assertIn(str(target / 'skills'), content)
+        self.assertEqual(source_before, SYNC_MODULE.tree_snapshot(self.source))
+        self.assertIn('skill-creator', self.state()['managed'])
+        self.assertIn('更新 0、未变化 2', self.run_sync(*args, '--dry-run'))
+
+    def test_missing_system_dependency_fails_before_writing_any_target(self):
+        import shutil
+        provider = self.system_dependency()
+        shutil.rmtree(provider)
+        for options in [('--dry-run',), ()]:
+            self.run_sync(*options, code=1)
+            self.assertFalse(self.target.exists())
+
+    def test_unaudited_and_mcp_system_dependencies_are_rejected(self):
+        self.system_dependency('another-provider')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+        provider = self.system_dependency()
+        (self.source / 'skills/keep/SKILL.md').write_text('---\nname: keep\ndescription: test\n---\n[provider](../.system/skill-creator/SKILL.md)\n')
+        (provider / 'SKILL.md').write_text('---\nname: skill-creator\ndescription: MCP operations\n---\n')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+
+    def test_dependency_target_conflict_preflights_both_targets(self):
+        self.system_dependency()
+        kimi = self.root / 'kimi'
+        (kimi / 'skills').mkdir(parents=True)
+        (kimi / 'skills/skill-creator').write_text('preserve')
+        self.run_sync('--target', 'all', '--kimi-root', str(kimi), code=1)
+        self.assertFalse(self.target.exists())
+        self.assertEqual('preserve', (kimi / 'skills/skill-creator').read_text())
+
+    def test_partial_staging_resolves_system_dependency_from_origin(self):
+        import shutil
+        self.system_dependency()
+        self.skill(self.source, 'unselected')
+        adapter = self.root / 'adapter'
+        shutil.copytree(self.source / 'skills/keep', adapter / 'skills/keep')
+        shutil.copy2(self.source / 'AGENTS.md', adapter / 'AGENTS.md')
+        self.run_sync('--origin-root', str(self.source), '--partial', source=adapter)
+        self.assertTrue((self.target / 'skills/skill-creator/SKILL.md').is_file())
+        self.assertFalse((self.target / 'skills/unselected').exists())
+
+    def test_dependency_retirement_uses_existing_management_baseline(self):
+        self.system_dependency()
+        self.run_sync()
+        (self.source / 'skills/keep/SKILL.md').write_text('---\nname: keep\ndescription: test\n---\n')
+        self.run_sync()
+        self.assertIn('skill-creator', self.state()['managed'])
+        self.run_sync('--delete')
+        self.assertFalse((self.target / 'skills/skill-creator').exists())
+
+    def test_unreferenced_system_skills_remain_excluded(self):
+        self.skill(self.source, '.system/skill-creator')
+        self.skill(self.source, '.system/unrelated')
+        self.run_sync()
+        self.assertFalse((self.target / 'skills/skill-creator').exists())
+        self.assertFalse((self.target / 'skills/unrelated').exists())
+
+    def test_unadapted_provider_runtime_path_fails_closed(self):
+        provider = self.system_dependency()
+        entry = provider / 'SKILL.md'
+        entry.write_text(entry.read_text() + '\nNew command: $CODEX_HOME/new-runtime\n')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+
+    def test_dependency_cannot_escape_provider_or_replace_another_source(self):
+        self.system_dependency()
+        dependent = self.source / 'skills/keep/SKILL.md'
+        (self.source / 'outside.md').write_text('outside')
+        dependent.write_text('---\nname: keep\ndescription: test\n---\n[escape](../.system/skill-creator/../../../outside.md)\n')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+        dependent.write_text('---\nname: keep\ndescription: test\n---\n[provider](../.system/skill-creator/SKILL.md)\n')
+        self.skill(self.source, 'skill-creator')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+
 if __name__ == "__main__":
     unittest.main()
