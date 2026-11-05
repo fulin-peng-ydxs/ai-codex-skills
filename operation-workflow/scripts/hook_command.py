@@ -23,7 +23,7 @@ import time
 import check_command as gate
 
 
-HOSTS = {"codex": False, "claude": True, "kimi": False}
+HOSTS = {"codex": False, "claude": True}
 ORDINARY_ASK = {"ask-pattern", "unmatched", "scenario-default", "scenario-exception", "scenario-not-covered"}
 MAX_INPUT = 2_000_000
 CONFIRM = "执行本次命令"
@@ -311,7 +311,7 @@ def evaluate(payload, project_root, operations_root=DEFAULT_OPERATIONS_ROOT, hos
         return result("stop", "invalid-cwd")
     if not belongs_to_project(cwd, root):
         return result("pass", "outside-project")
-    if payload.get("tool_name") not in {"Bash", "Shell", "exec_command"}:
+    if payload.get("tool_name") not in {"Bash", "exec_command"}:
         return result("stop", "unsupported-tool")
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
@@ -405,6 +405,8 @@ def host_response(report, host):
 
 def registration(host, project_root, operations_root=DEFAULT_OPERATIONS_ROOT):
     """Render the command hook only; never change or bypass host permissions."""
+    if host not in HOSTS:
+        raise ValueError("unsupported host")
     operations_root = operations_path(project_root, operations_root)
     arguments = [sys.executable, str(Path(__file__).resolve()), "--host", host,
                  "--project-root", str(Path(project_root).resolve())]
@@ -413,9 +415,6 @@ def registration(host, project_root, operations_root=DEFAULT_OPERATIONS_ROOT):
     if operations_root != DEFAULT_OPERATIONS_ROOT:
         arguments += ["--operations-root", operations_root]
     command = shlex.join(arguments)
-    if host == "kimi":
-        return '\n'.join(['[[hooks]]', 'event = "PreToolUse"', 'matcher = "^(Bash|Shell)$"',
-                          'command = '+json.dumps(command), 'timeout = 10'])
     return json.dumps({"hooks": {"PreToolUse": [{"matcher": "^Bash$", "hooks": [
         {"type": "command", "command": command, "timeout": 10}]}]}}, ensure_ascii=False, indent=2)
 

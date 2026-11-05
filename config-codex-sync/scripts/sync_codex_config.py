@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize Codex user skills and collaboration instructions to Claude and Kimi."""
+"""Synchronize Codex user skills and collaboration instructions to Claude."""
 
 from __future__ import annotations
 
@@ -67,13 +67,13 @@ def default_root(primary_env: str, fallback: str, secondary_env: str | None = No
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="将 Codex 全局技能和协作说明更新到 Claude、Kimi 用户目录。"
+        description="将 Codex 全局技能和协作说明更新到 Claude 用户目录。"
     )
     parser.add_argument(
         "--target",
-        choices=("all", "claude", "kimi"),
-        default="all",
-        help="同步目标，默认 all。",
+        choices=("claude", "all"),
+        default="claude",
+        help="同步目标，默认 claude；all 为兼容别名，同样只同步 Claude。",
     )
     parser.add_argument(
         "--codex-root",
@@ -86,12 +86,6 @@ def parse_args() -> argparse.Namespace:
         type=expand_path,
         default=default_root("CLAUDE_CONFIG_DIR", "~/.claude", "CLAUDE_HOME"),
         help="Claude Code 用户根目录。",
-    )
-    parser.add_argument(
-        "--kimi-root",
-        type=expand_path,
-        default=default_root("KIMI_CODE_HOME", "~/.agents"),
-        help="Kimi Code 用户根目录。",
     )
     parser.add_argument(
         "--dry-run",
@@ -532,18 +526,15 @@ def sync_document(source: Path, destination: Path, dry_run: bool) -> str:
 
 
 def selected_targets(args: argparse.Namespace) -> list[tuple[str, Path]]:
-    targets: list[tuple[str, Path]] = []
-    if args.target in ("all", "claude"):
-        targets.append(("Claude", args.claude_root))
-    if args.target in ("all", "kimi"):
-        targets.append(("Kimi", args.kimi_root))
-    return targets
+    """Resolve both accepted selectors to the sole supported destination."""
+    return [("Claude", args.claude_root)]
 
 
 def target_document_name(label: str) -> str:
-    if label == "Claude":
-        return "CLAUDE.md"
-    return "AGENTS.md"
+    """Keep collaboration instructions bound to the supported target."""
+    if label != "Claude":
+        raise SyncError(f"不支持的同步目标：{label}")
+    return "CLAUDE.md"
 
 
 def run_sync(args: argparse.Namespace, targets: list[tuple[str, Path]], stack: ExitStack) -> int:

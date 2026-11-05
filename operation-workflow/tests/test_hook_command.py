@@ -9,7 +9,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-import tomllib
 import unittest
 from unittest.mock import patch
 
@@ -254,13 +253,24 @@ class HookTests(unittest.TestCase):
             self.assertEqual("invalid-policy",hook.evaluate(self.event(),self.project)["reason"])
 
 
-    def test_three_registration_formats_are_parseable_and_read_only(self):
+    def test_supported_registration_formats_are_parseable_and_read_only(self):
         for host in hook.HOSTS:
             config=hook.registration(host,self.project)
-            parsed=tomllib.loads(config) if host=="kimi" else json.loads(config)
+            parsed = json.loads(config)
             self.assertIn("hooks",parsed)
             self.assertIn("--project-root",config)
         self.assertFalse((self.project/".codex").exists())
+
+    def test_unsupported_hosts_and_tool_aliases_do_not_enter_the_gate(self):
+        """Reject removed adapters before producing a runnable registration."""
+        with self.assertRaises(ValueError):
+            hook.registration("unsupported", self.project)
+        generated = self.cli("unsupported", extra=("--print-config",))
+        self.assertEqual(2, generated.returncode)
+        self.assertEqual("", generated.stdout)
+        event = self.event()
+        event["tool_name"] = "Shell"
+        self.assertEqual("unsupported-tool", hook.evaluate(event, self.project)["reason"])
 
     def test_custom_operations_root_is_used_by_generated_registrations(self):
         custom = self.project/"custom operations"
@@ -274,9 +284,8 @@ class HookTests(unittest.TestCase):
             with self.subTest(host=host):
                 generated = self.cli(host, extra=("--operations-root", "custom operations", "--print-config"))
                 self.assertEqual(0, generated.returncode, generated.stderr)
-                parsed = tomllib.loads(generated.stdout) if host == "kimi" else json.loads(generated.stdout)
-                command = (parsed["hooks"][0]["command"] if host == "kimi" else
-                           parsed["hooks"]["PreToolUse"][0]["hooks"][0]["command"])
+                parsed = json.loads(generated.stdout)
+                command = parsed["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
                 argv = shlex.split(command)
                 self.assertEqual("custom operations", argv[argv.index("--operations-root")+1])
                 checked = subprocess.run(argv, input=json.dumps(self.event()), text=True,
@@ -597,9 +606,8 @@ class HookTests(unittest.TestCase):
         prefix = [str(fake), *self.prefix[1:]]
         for host in hook.HOSTS:
             config = hook.registration(host, self.project)
-            parsed = tomllib.loads(config) if host == "kimi" else json.loads(config)
-            command = (parsed["hooks"][0]["command"] if host == "kimi" else
-                       parsed["hooks"]["PreToolUse"][0]["hooks"][0]["command"])
+            parsed = json.loads(config)
+            command = parsed["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
             for remote, expected in [("id", "allow"), (self.docker+"service update --force redis", "ask"),
                                      (self.docker+"service update --force redis", "ask"), ("rm -rf /", "deny")]:
                 event = self.event(remote, prefix)
@@ -616,7 +624,7 @@ class HookTests(unittest.TestCase):
                 else:
                     self.assertEqual(2, proc.returncode)
                     self.assertEqual("", proc.stdout)
-        self.assertEqual(3, len(marker.read_text().splitlines()))
+        self.assertEqual(2, len(marker.read_text().splitlines()))
 
 
 if __name__ == "__main__":

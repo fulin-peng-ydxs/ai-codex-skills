@@ -346,28 +346,39 @@ class ManagedRetirementTest(unittest.TestCase):
         (provider / 'scripts/init_skill.py').write_text('print("initializer")\n')
         return provider
 
-    def test_system_dependency_adapted_for_both_targets_without_source_changes(self):
+    def test_system_dependency_adapted_for_supported_selectors_without_source_changes(self):
         provider = self.system_dependency()
         source_before = SYNC_MODULE.tree_snapshot(self.source)
-        kimi = self.root / 'kimi target'
-        args = ('--target', 'all', '--kimi-root', str(kimi))
-        preview = self.run_sync(*args, '--dry-run')
+        self.target = self.root / 'claude target'
+        preview = self.run_sync('--dry-run')
         self.assertIn('skill-creator', preview)
         self.assertFalse(self.target.exists())
-        self.assertFalse(kimi.exists())
-        self.run_sync(*args)
-        for target in [self.target, kimi]:
-            dependent = target / 'skills/keep/SKILL.md'
+        for selector in ['claude', 'all']:
+            self.run_sync('--target', selector)
+            dependent = self.target / 'skills/keep/SKILL.md'
             self.assertIn('../skill-creator/SKILL.md#initialize', dependent.read_text())
             self.assertTrue((dependent.parent / '../skill-creator/SKILL.md').is_file())
             self.assertEqual((provider / 'scripts/init_skill.py').read_bytes(),
-                             (target / 'skills/skill-creator/scripts/init_skill.py').read_bytes())
-            content = (target / 'skills/skill-creator/SKILL.md').read_text()
+                             (self.target / 'skills/skill-creator/scripts/init_skill.py').read_bytes())
+            content = (self.target / 'skills/skill-creator/SKILL.md').read_text()
             self.assertNotIn('CODEX_HOME', content)
-            self.assertIn(str(target / 'skills'), content)
+            self.assertIn(str(self.target / 'skills'), content)
         self.assertEqual(source_before, SYNC_MODULE.tree_snapshot(self.source))
         self.assertIn('skill-creator', self.state()['managed'])
-        self.assertIn('更新 0、未变化 2', self.run_sync(*args, '--dry-run'))
+        self.assertIn('更新 0、未变化 2', self.run_sync('--dry-run'))
+
+    def test_default_sync_is_single_target_and_unknown_selectors_fail_before_writes(self):
+        """The CLI default and compatibility alias must share one destination."""
+        import subprocess
+        command = [sys.executable, str(SCRIPT_PATH), '--codex-root', str(self.source),
+                   '--claude-root', str(self.target)]
+        rejected = subprocess.run(command + ['--target', 'unsupported'], capture_output=True, text=True)
+        self.assertEqual(2, rejected.returncode)
+        self.assertFalse(self.target.exists())
+        completed = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertTrue((self.target / 'CLAUDE.md').is_file())
+        self.assertEqual({self.source, self.target}, set(self.root.iterdir()))
 
     def test_missing_system_dependency_fails_before_writing_any_target(self):
         import shutil
@@ -387,14 +398,14 @@ class ManagedRetirementTest(unittest.TestCase):
         self.run_sync(code=1)
         self.assertFalse(self.target.exists())
 
-    def test_dependency_target_conflict_preflights_both_targets(self):
+    def test_dependency_target_conflict_preflights_all_skill_writes(self):
         self.system_dependency()
-        kimi = self.root / 'kimi'
-        (kimi / 'skills').mkdir(parents=True)
-        (kimi / 'skills/skill-creator').write_text('preserve')
-        self.run_sync('--target', 'all', '--kimi-root', str(kimi), code=1)
-        self.assertFalse(self.target.exists())
-        self.assertEqual('preserve', (kimi / 'skills/skill-creator').read_text())
+        (self.target / 'skills').mkdir(parents=True)
+        (self.target / 'skills/skill-creator').write_text('preserve')
+        self.run_sync('--target', 'all', code=1)
+        self.assertFalse((self.target / 'skills/keep').exists())
+        self.assertFalse((self.target / 'CLAUDE.md').exists())
+        self.assertEqual('preserve', (self.target / 'skills/skill-creator').read_text())
 
     def test_partial_staging_resolves_system_dependency_from_origin(self):
         import shutil

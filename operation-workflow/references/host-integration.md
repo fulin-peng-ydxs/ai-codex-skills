@@ -12,11 +12,10 @@
 | --- | --- | --- | --- |
 | Claude Code | 不追加许可 | 返回`permissionDecision=ask`，由宿主取得答复 | 阻止 |
 | Codex | 继续 | 暂停，由AI问询；重试时核验真实答复，单次放行 | 退出2阻止 |
-| Kimi Code | 退出0继续 | 尚未接通确认，阻止并报告缺口 | 退出2阻止 |
 
-Claude的ask响应使用PreToolUse事件。Kimi适配当前Bash及旧Shell输入，其他错误码可能被宿主放行。各宿主自身的执行权限检查继续生效。
+Claude的ask响应使用PreToolUse事件。各宿主自身的执行权限检查继续生效。
 
-原生ask和AI问询是两种确认衔接方式，不能因Hook不支持直接ask就把方案改成命令清单。Codex问询桥接只解决项目命令策略的人工决定；例如平台执行权限为never时，仍不能申请沙箱提权，但可以在已有平台权限内确认任务操作。不能改变宿主权限来制造弹窗。Kimi尚缺可核验答复的适配，不能用文件标签或工具参数伪造支持。
+原生ask和AI问询是两种确认衔接方式，不能因Hook不支持直接ask就把方案改成命令清单。Codex问询桥接只解决项目命令策略的人工决定；例如平台执行权限为never时，仍不能申请沙箱提权，但可以在已有平台权限内确认任务操作。不能改变宿主权限来制造弹窗。
 
 ### Codex当次命令确认
 
@@ -50,7 +49,6 @@ Claude的ask响应使用PreToolUse事件。Kimi适配当前Bash及旧Shell输入
 
 - `codex`：项目`.codex/hooks.json`。
 - `claude`：项目`.claude/settings.json`。
-- `kimi`：用户`~/.kimi-code/config.toml`。
 
 Codex问询桥接依赖已安装CLI和可读的原生会话历史；缺少有效session_id/turn_id或宿主不保留所需历史时暂停并报告，不能扩大批准范围。启用时完成宿主要求的原生审阅/信任，并以实际安全探针确认拦截；配置存在、enabled或trusted标签均不能代替运行证据。
 
@@ -74,9 +72,9 @@ Codex问询桥接依赖已安装CLI和可读的原生会话历史；缺少有效
 
    由AI负责读取、合并并保存配置，不只交付生成命令。复用已自检的`--print-config`输出，将host替换为当前宿主；自定义OPS_ROOT追加`--operations-root <项目相对路径>`。目标配置缺失时创建必要文件。
 
-   以适配器入口、宿主及project-root识别本技能已有注册，相同内容不重复追加，变化时仅更新对应条目。保留其他Hook、事件、权限和设置；Kimi使用用户级文件时只添加绑定本项目的条目，保留其他项目配置并说明影响范围。
+   以适配器入口、宿主及project-root识别本技能已有注册，相同内容不重复追加，变化时仅更新对应条目。保留其他Hook、事件、权限和设置。
 
-   JSON/TOML损坏或归属冲突先停止修改并核实，不覆盖整个文件，不为让验证通过而删除或放宽其他规则。
+   JSON损坏或归属冲突先停止修改并核实，不覆盖整个文件，不为让验证通过而删除或放宽其他规则。
 
    将本地临时探针和使用标记所在`.local/`纳入Git忽略，保留原忽略规则。配置只引用共享适配器和项目策略，不复制权限表。
 
@@ -146,4 +144,4 @@ Codex问询桥接依赖已安装CLI和可读的原生会话历史；缺少有效
 
 普通本地命令仍服从宿主原权限；任意可执行程序、文件工具、SQL/API及持续write_stdin输入未形成完整覆盖。不提供同账号防篡改或系统级隔离。脚本捕获的错误统一阻止，但宿主对脚本启动失败、超时或未覆盖路径可能继续执行；因此必须分别验证适配器和真实宿主。
 
-协议与限制见[Codex Hooks](https://learn.chatgpt.com/docs/hooks)、[Claude Hooks](https://code.claude.com/docs/en/hooks)、[Kimi Hooks](https://moonshotai.github.io/kimi-code/en/customization/hooks)。验收按上述初始化接入步骤执行；模拟事件不能冒充真实客户端验收。Windows/PowerShell不属于当前支持的命令入口。
+协议与限制见[Codex Hooks](https://learn.chatgpt.com/docs/hooks)、[Claude Hooks](https://code.claude.com/docs/en/hooks)。验收按上述初始化接入步骤执行；模拟事件不能冒充真实客户端验收。Windows/PowerShell不属于当前支持的命令入口。
