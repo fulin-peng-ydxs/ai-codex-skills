@@ -13,6 +13,8 @@ description: 审查本地暂存、未暂存改动或指定远端 PR（编号或 
 
 用户提供 PR 编号或 URL 时以该 PR 为范围；未指定 PR 或要求审查当前改动时，读取当前工作区与暂存区。先读取适用规范和改动背景，定位相关入口、消费方与测试。输入缺失到无法确定目标时，只询问必要信息。
 
+审查代码时读取 [编码规范](~/ai-agent-config/config/force/coding-standards.md)，选择验证或判定验证证据时读取 [测试规范](~/ai-agent-config/config/force/testing-standards.md)；已读取的直接复用。通用编码与验证要求由上述规范维护，下文维护审查流程、维度及反馈契约。
+
 ## 执行流程
 
 1. **准备范围**：本地使用 `git status`、`git diff` 和 `git diff --staged`；远端读取 PR 描述、差异和已有评论，理解目标与背景。优先只读审查；需要本地运行时可使用 `gh pr checkout <PR_NUMBER>`，但须先保护已有工作、记录原分支与工作区，不覆盖或擅自暂存用户改动。
