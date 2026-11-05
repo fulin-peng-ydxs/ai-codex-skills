@@ -1,6 +1,6 @@
 # 代码审查正式报告模板
 
-本文唯一维护完整正式报告的结构、字段和内容验收；审查流程、问题分类、授权与保存边界由 [技能入口](../SKILL.md) 维护。首次生成或整体重构读取 [文档输出规范](~/ai-agent-config/config/force/document-output.md) 和 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)，保存和局部更新保留授权基线。
+本文唯一维护完整正式报告的结构、字段和内容验收；审查流程、问题分类、授权与保存边界由 [技能入口](../SKILL.md) 维护。首次生成或整体重构读取 [文档编写规范](~/ai-agent-config/config/force/document-output.md)，保存和局部更新保留授权基线。
 
 ## 完整模板
 

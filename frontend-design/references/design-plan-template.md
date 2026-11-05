@@ -1,6 +1,6 @@
 # 前端设计方案固定模板
 
-本文维护完整设计方案的结构与内容验收；视觉决策方法及实施由 [技能入口](../SKILL.md) 维护，原型与 DESIGN 规范分别由其专属技能维护。生成前读取 [文档输出规范](~/ai-agent-config/config/force/document-output.md) 和 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。只讨论局部选择不自动生成完整方案，不因使用模板落盘或启动开发。
+本文维护完整设计方案的结构与内容验收；视觉决策方法及实施由 [技能入口](../SKILL.md) 维护，原型与 DESIGN 规范分别由其专属技能维护。生成前读取 [文档编写规范](~/ai-agent-config/config/force/document-output.md)。只讨论局部选择不自动生成完整方案，不因使用模板落盘或启动开发。
 
 ## 完整模板
 

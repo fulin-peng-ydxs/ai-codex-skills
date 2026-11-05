@@ -119,7 +119,7 @@
 
 ## 文档输出规则入口
 
-通用规则见 [文档输出规范](~/ai-agent-config/config/force/document-output.md)，权威归属见 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)。下表只按产物用途选择入口，不另定义结构策略、目录或字段。规范接入方式由 [技能编写规范](skill-authoring-standard/SKILL.md#核心约束) 维护，机器检查用法见 [模板检查器](skill-authoring-standard/references/template-validation.md)。
+通用规则见 [文档编写规范](~/ai-agent-config/config/force/document-output.md)。下表只按产物用途选择入口，不另定义结构策略、目录或字段。技能设计见 [技能编写规范](skill-authoring-standard/SKILL.md)，模板设计与机器检查见 [模板设计与校验](skill-authoring-standard/references/template-validation.md)。
 
 | 产物或任务 | 技能范围 | 权威入口 |
 | --- | --- | --- |

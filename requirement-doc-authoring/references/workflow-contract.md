@@ -2,7 +2,7 @@
 
 供需求闭环、正式需求、页面原型和开发计划技能读取；只维护四阶段共用的事实调研、成果继承、范围状态和交接规则，并接入通用文档规范。各阶段的执行流程、编号分配和执行状态由所属技能维护，产物结构、字段及内容验收由各自唯一模板维护。
 
-执行时读取 [协作规则](~/ai-agent-config/config/force/collaboration-rule.md) 的授权、目录与成果覆盖要求，[文档输出规范](~/ai-agent-config/config/force/document-output.md) 的结构、裁剪和已有成果处理要求，以及 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md) 的内容归属要求；已读取的直接复用。本文不重复定义这些通用规则。
+执行时读取 [协作规则](~/ai-agent-config/config/force/collaboration-rule.md) 的授权、目录与成果覆盖要求，[文档编写规范](~/ai-agent-config/config/force/document-output.md) 的内容组织、结构和已有成果处理要求；已读取的直接复用。本文不重复定义这些通用规则。
 
 ## 事实与继承
 

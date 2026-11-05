@@ -1,6 +1,6 @@
 # 后端内存风险固定模板
 
-本文唯一维护该产物的固定结构、字段、条件槽位和内容验收；执行流程、授权与保存由 [技能入口](../SKILL.md) 维护。生成或整体重构前读取 [文档输出规范](~/ai-agent-config/config/force/document-output.md) 与 [文档边界规范](~/ai-agent-config/config/force/document-boundaries.md)，更新和保存遵循其保留边界。
+本文唯一维护该产物的固定结构、字段、条件槽位和内容验收；执行流程、授权与保存由 [技能入口](../SKILL.md) 维护。生成或整体重构前读取 [文档编写规范](~/ai-agent-config/config/force/document-output.md)，更新和保存遵循其保留边界。
 
 ## 生成说明
 
