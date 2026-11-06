@@ -9,7 +9,7 @@ description: 核查本次开发改动的业务闭环，检查入口、状态、�
 
 判断本次改动放回完整业务链路后是否成立，以业务功能为核查单位，代码缺陷作为业务影响的证据。只做核查及获准的报告维护，不修改业务代码。
 
-参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md) · [协作与目录规则](~/ai-agent-config/config/force/collaboration-rule.md)。具体检查项见 [核查维度](references/audit-dimensions.md)，正式产物见 [报告模板](references/report-template.md)。
+参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md) · [协作规则](~/ai-agent-config/config/force/collaboration-rule.md)。具体检查项见 [核查维度](references/audit-dimensions.md)，正式产物见 [报告模板](references/report-template.md)。
 
 ## 输入与前置条件
 
@@ -61,7 +61,7 @@ description: 核查本次开发改动的业务闭环，检查入口、状态、�
 
 ## 产出边界与交付
 
-正式产档默认文件名 `business-audit.md`，目录按协作规则确定，标题使用中文业务功能名称。同范围已有报告优先更新，不创建平行版本；保留有效背景、历史内容和证据，修正失效结论，归档按协作规则处理。
+正式产档默认文件名 `business-audit.md`，目录按文档编写规范确定，标题使用中文业务功能名称。同范围已有报告优先更新，不创建平行版本；保留有效背景、历史内容和证据，修正失效结论，归档按文档编写规范处理。
 
 报告模板维护结构、稳定问题编号和处理状态；需求、架构和实施过程只保留本次判断需要的摘要及引用。未发现明显问题也须说明覆盖与盲区；建议不等于已实施，静态确认不等于联调或线上验证。
 
