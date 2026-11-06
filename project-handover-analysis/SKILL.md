@@ -7,9 +7,11 @@ description: 基于源码、配置及构建部署材料评估完整项目或多�
 
 ## 职责与边界
 
+参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md)。
+
 面向接手开发者或技术负责人，判断“交付了什么、能否构建运行、缺什么、先接手什么、怎样确认可维护”。报告是指定范围与时点的评估快照。
 
-本文维护分析流程与操作边界；[项目发现](references/project-discovery.md) 维护调研方法，[证据判定](references/evidence-completeness-security.md) 维护完整性、安全和质量要求，[报告模板](assets/project-handover-report-template.md) 统一维护固定模板与最低内容。
+调研方法见 [项目发现](references/project-discovery.md)，完整性、安全及质量判断见 [证据判定](references/evidence-completeness-security.md)，完整报告使用 [报告模板](assets/project-handover-report-template.md)。
 
 系统/部署架构及技术原理由 `project-module-architecture-doc-authoring` 维护，业务环节与字段、状态、权限明细由 `business-closed-loop-analysis` 维护，最小使用入口归 README。报告引用这些事实并评价接手影响，不复制整套正文；缺少专题时仍保留足以独立作出接手判断的上下文，不自动生成其他交付物。
 
@@ -29,7 +31,7 @@ description: 基于源码、配置及构建部署材料评估完整项目或多�
 
 ## 核心约束
 
-默认简体中文，代码、标识和既有术语保持原样，用户语言要求优先。源码和配置用于核实实现，权威文档用于核实交付约定与规范；冲突必须说明，不能把静态配置当生产状态，也不能用实现覆盖有效规范。
+源码和配置用于核实实现，权威文档用于核实交付约定与规范；冲突必须说明，不能把静态配置当生产状态，也不能用实现覆盖有效规范。
 
 不读取依赖缓存、构建产物、压缩包或大体积二进制的内容，除非它们是唯一交付物且用户要求检查。不输出凭据或无必要的内网端点；不自动修代码、配置、数据库或部署环境，不因发现问题提交代码或操作外部系统。
 

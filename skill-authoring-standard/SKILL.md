@@ -7,7 +7,7 @@ description: 创建或重构用户自有技能、统一技能名称时，设计�
 
 ## 职责与边界
 
-设计和重构自有技能的流程、资源与产物契约；从参考产物创建模板技能使用 `template-creator`。
+设计和重构自有技能的触发、判断、执行、资源与产物契约；从参考产物创建模板技能使用 `template-creator`。
 
 参考：[skill-creator](../.system/skill-creator/SKILL.md) · [命名](references/skill-naming.md) · [正文骨架](references/skill-template.md) · [固定模板设计与校验](references/template-validation.md) · [文档编写规范](~/ai-agent-config/config/force/document-output.md) · [测试](~/ai-agent-config/config/force/testing-standards.md)。按任务选择适用内容。
 
@@ -19,7 +19,7 @@ description: 创建或重构用户自有技能、统一技能名称时，设计�
 
 1. **确定契约**：识别触发、排除、输入、执行分支、授权、输出、异常及验证要求。重构保留条件和例外，新建依据用户要求及有效规范。
 2. **确定入口**：创建或重命名时检查标识冲突，用简洁的 `description` 表达能力和触发条件，只为易误触发场景补排除。
-3. **设计产物与流程**：文档生成技能先完成唯一模板和代表性试填，再接入取证、分析、生成及检查步骤。新建或整体重构采用正文骨架。
+3. **设计产物与流程**：新文档生成能力先完成唯一模板和代表性试填，再接入取证、分析、生成及检查步骤；复用未变的有效模板和试填证据，不因正文重构重建产物。新建或整体重构采用正文骨架。
 4. **组织资源**：共用判断留正文，独立模式、完整模板及较长专项材料按需拆分；总是一起使用且无共享收益的内容不拆。初始化复用 `<skills-root>/.system/skill-creator/scripts/init_skill.py`，不重建已有技能。
 5. **验证交付**：核对契约变化、引用与实际使用路径，执行适用检查，修复后复核。
 

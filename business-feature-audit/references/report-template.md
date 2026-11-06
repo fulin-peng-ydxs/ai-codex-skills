@@ -1,10 +1,6 @@
 # 业务闭环核查固定模板
 
-本文唯一维护该产物的固定结构、字段、条件槽位和内容验收；执行流程、授权与保存由 [技能入口](../SKILL.md) 维护。生成或整体重构前读取 [文档编写规范](~/ai-agent-config/config/force/document-output.md)，更新和保存遵循其保留边界。
-
-## 生成说明
-
-使用下方完整模板填充；标记语法及校验命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。本产物的具体填写要求见模板后的内容验收，通用生成与更新边界沿用上述全局规范。
+执行与保存见 [技能入口](../SKILL.md)；模板语法与检查命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。填写后按本文内容验收核对。
 
 ## 完整模板
 

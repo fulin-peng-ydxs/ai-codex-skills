@@ -9,7 +9,7 @@ description: 将 Codex 全局技能集合和协作说明同步到 Claude Code �
 
 将 Codex 作为唯一来源，同步用户级技能和协作说明。使用随技能提供的 `scripts/sync_codex_config.py`，不要临时拼接复制命令。
 
-本文维护同步范围、路径适配和目标端验证规则；实际枚举、写入、管理清单与 CLI 参数由 `scripts/sync_codex_config.py` 实现。已批准退役项与可信历史文件哈希在 `references/retired-skills.json` 维护，不以目标现状冒充历史基线。
+参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md)。已批准退役项及可信历史哈希见 `references/retired-skills.json`；不能以目标现状冒充历史基线。
 
 ## 输入与前置条件
 
@@ -59,7 +59,7 @@ python3 scripts/sync_codex_config.py --help
    ```
 
 6. 同步后检查目标文件与实际同步源一致，并验证技能中的运行时路径指向目标安装根目录、被引用文件真实存在、没有遗留会导致目标端误读 Codex 安装目录的路径。
-7. 报告每个目标新增、更新、未变化的技能数量、协作文档状态和路径适配结果。提示重新启动或新建 Claude 会话以加载新配置。
+7. 按交付要求报告结果，提示重新启动或新建 Claude 会话加载新配置。
 
 同步目标默认为 `claude`，`--target all` 作为兼容别名也仅处理 Claude。非默认安装位置使用 `--codex-root`、`--claude-root`。使用临时源时，预览与执行命令必须显式携带完全相同的 `--target` 和 `--codex-root`，不能在执行阶段退回默认全量源。
 
@@ -76,7 +76,7 @@ python3 scripts/sync_codex_config.py --help
 
 ### 同步规则
 
-同步已有文档遵循 [文档编写规范](~/ai-agent-config/config/force/document-output.md) 的保留原则：除已定义的目标路径适配外，保留源文档的结构策略、核心内容和固定契约，不在同步过程中重写模板；引用的共享规范须在目标环境可读。
+除已定义的目标路径适配外，保留源文档的结构、内容和固定契约，不在同步中重写模板；共享规范须在目标环境可读。
 
 - 主同步集合只包含 Codex skills 根目录中含 `SKILL.md` 的一级技能目录，以及具有有效 YAML frontmatter 的一级 Markdown 技能文件；另按上述规则补齐实际被引用的可移植系统依赖。
 - 禁止同步任何 MCP 相关技能，不区分创建、同步、审计、监控、安全或其他用途。技能目录名、技能文件名或 YAML frontmatter 中出现 `MCP`（不区分大小写）时，预览与执行均排除，并在输出中列出。
@@ -88,7 +88,7 @@ python3 scripts/sync_codex_config.py --help
 - 删除依据完整源集合、管理清单和明确退役记录，不以文件时间或仅在源中缺失推断是否过期；不删除项目技能或源端文件。执行前预检全部目标路径冲突，删除失败如实报告已完成部分，不宣称原子回滚。
 - 将 Codex 的 `AGENTS.md` 作为源文档同步到目标安装根目录；Claude 目标文件名为 `CLAUDE.md`，使用原子替换避免半写入。
 - 路径类型冲突、源缺失或目标位于源内部时停止，不猜测处理，也不删除冲突目标。
-- 不同步任何 MCP 相关技能，也不同步凭据、会话、日志、MCP 配置、插件缓存或其他安装文件。
+- 不同步凭据、会话、日志、MCP 配置、插件缓存或其他安装文件。
 
 ### 同步管理清单与冲突
 

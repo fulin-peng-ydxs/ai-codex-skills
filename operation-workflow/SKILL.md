@@ -7,6 +7,8 @@ description: 初始化运维工作空间、接入服务器、盘点服务，按�
 
 ## 职责与边界
 
+参考：[确认机制](~/ai-agent-config/config/force/collaboration-rule.md#需要先确认时) · [文档编写规范](~/ai-agent-config/config/force/document-output.md)。
+
 本技能维护执行顺序和授权节点。[工作空间](references/workspace.md) 定义初始化、清单和手册；[命令策略](references/command-policy.md) 定义场景默认行为、例外模式、通配写法及分类结果处理；[宿主接入](references/host-integration.md) 定义Hook注册、命令确认衔接与通道验证；[留痕](references/records.md) 定义审阅与执行证据的分工、关联和归档。环境事实保存在目标项目。
 
 ## 输入与前置条件
@@ -23,7 +25,7 @@ description: 初始化运维工作空间、接入服务器、盘点服务，按�
 - 只读排查/盘点：白名单连接 → 按命令分类采集 → 汇报归档。
 - 服务器改动：白名单连接检查 → 变更方案 → 批准执行 → 验证汇报 → 归档。
 
-实际任务先读取目标策略、相关手册及[留痕要求](references/records.md)，检查 Git 基线。统一用 `record.md` 承载人工审阅，用 `execution.md` 承载命令明细与来源证据；职责固定，不按任务规模或复杂程度切换结构。人工确认前读取 [全局协作规则“需要先确认时”](~/ai-agent-config/config/force/collaboration-rule.md#需要先确认时)，确认渠道、降级和答复效力统一遵守该入口。初始化及维护手册时读取工作空间要求，只补任务需要的事实。
+实际任务先读取目标策略、相关手册及[留痕要求](references/records.md)，检查 Git 基线。统一用 `record.md` 承载人工审阅，用 `execution.md` 承载命令明细与来源证据；职责固定，不按任务规模或复杂程度切换结构。人工确认前读取全局协作规则“需要先确认时”，确认渠道、降级和答复效力统一遵守该入口。初始化及维护手册时读取工作空间要求，只补任务需要的事实。
 
 执行服务器操作前，遇到首次初始化、首次换用其他宿主或Hook注册/执行通道变化时，先完成[初始化接入步骤](references/host-integration.md#初始化接入步骤)；已有项目只补对应接入，不重新初始化清单或盘点其他目标。已验证且未变化的同一通道直接复用；普通代码修正按影响补隔离回归，不自动重复人工授权探针。配置存在不能代替实际接入结果。准备阶段同时核对[受控本地校验入口](references/host-integration.md#受控本地校验入口)，避免执行后才发现必需门禁不可用。
 
