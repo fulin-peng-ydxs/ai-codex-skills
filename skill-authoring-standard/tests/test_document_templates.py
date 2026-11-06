@@ -707,7 +707,6 @@ class FixedDocumentTests(unittest.TestCase):
         review = filled(blocks['record'])
         detail = filled(blocks['execution'])
         fields = {
-            '用途与归属': '隔离试填的人工审阅入口，明细见[O01](execution.md#操作o01)；不代表真实服务器任务。',
             '目标与验收': '测试服务demo_portal从1副本扩至2副本；期望与运行均为2，业务健康另行检查。',
             '当前结论': '待执行；目前没有服务器变更。',
             '异常与未验证': '运行副本数及业务均未验证，尚不能判断目标达成。',
@@ -731,7 +730,7 @@ class FixedDocumentTests(unittest.TestCase):
             review = review.replace(f'| {item} | 样例1 | 样例1 |',
                                     f'| {item} | 未执行：方案尚待批准 | 无：没有实际决定或执行证据 |')
         fields = {
-            '用途与归属': '隔离试填明细，人工决定见[S01/v1](record.md#方案s01v1)，不连接真实服务器。',
+            '任务记录': '隔离试填，人工决定见[S01/v1](record.md#方案s01v1)，不连接真实服务器。',
             '会话定位': '隔离样例；工具为Codex，会话ID与链接均未取得，不对应真实会话。',
             '目标与身份': '模拟测试服务demo_portal；身份和提权仅为候选，执行前必须核实。',
             '连接与核验': '未连接；本测试只验证文档结构，不产生连接授权。',
@@ -787,9 +786,52 @@ class FixedDocumentTests(unittest.TestCase):
         source = (ROOT / 'code-review/references/report-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
         self.assertEqual([], check.validate(good, source))
-        self.assertTrue(check.validate(good.replace('- 用途与归属：样例1\n', ''), source))
+        self.assertTrue(check.validate(good.replace('- 审查范围与基线：样例1\n', ''), source))
         no_issues = good[:good.index('### Q')] + '条目情况：无：已核对本次隔离样例的指定范围。\n\n' + good[good.index('## 3.') :]
         self.assertEqual([], check.validate(no_issues, source))
+
+    def test_readme_without_extra_tasks_keeps_the_first_use_path(self):
+        source = (ROOT / 'project-readme-authoring/references/output-contract.md').read_text()
+        # A static resource can have a complete first-use path and no other tasks.
+        document = '''# 示例色板资源
+
+- 定位与读者：隔离试填，供设计师读取一份静态色板；没有应用进程。
+
+## 项目与适用场景
+
+- 核心能力与边界：查看并引用 palette.svg 中的颜色，不提供在线编辑。
+- 运行形态与兼容范围：静态 SVG；试填假定交付包含此文件，未验证真实浏览器兼容性。
+
+## 从准备到首次使用
+
+- 前置环境与依赖：需支持 SVG 的查看器；无包管理器或构建依赖。
+- 配置与数据准备：不适用：无配置、账号和数据库。
+- 获取与启动步骤：解压交付包后用查看器打开根目录 palette.svg；没有服务启动命令。
+- 首次使用与成功结果：打开色板，能看到色块及其色值；这是试填判据，未实际运行。
+- 停止、清理与失败入口：关闭查看器即可；打不开时核对文件是否完整及查看器是否支持 SVG。
+
+## 常用任务
+
+条目情况：无：首次使用已覆盖该资源的全部操作，没有额外开发或维护任务。
+
+## 代码入口与文档导航
+
+| 路径或文档 | 职责及使用时机 | 权威正文或深入入口 |
+| --- | --- | --- |
+| palette.svg | 查看色块与数值 | 试填假定的唯一资源文件 |
+
+- 结构与依赖摘要：只有根目录静态资源，没有源码子模块或运行时依赖。
+
+## 协作说明
+
+- 项目规则与贡献入口：试填未提供独立协作规则；不能推定真实项目存在入口。
+- 许可证与引用：未提供许可，授权范围待核实。
+'''
+        absence = '条目情况：无：首次使用已覆盖该资源的全部操作，没有额外开发或维护任务。\n'
+        self.assertEqual([], check.validate(document, source))
+        self.assertTrue(check.validate(document.replace(absence, ''), source))
+        first_use = next(line for line in document.splitlines(True) if line.startswith('- 首次使用与成功结果：'))
+        self.assertTrue(check.validate(document.replace(first_use, ''), source))
 
     def test_valid_report_and_multiple_entries(self):
         self.assertEqual([], check.validate(GOOD, CONTRACT))
