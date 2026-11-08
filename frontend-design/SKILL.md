@@ -79,7 +79,9 @@ description: 为新建、重构或局部修改页面与组件提供视觉和交�
 
 ## 产出边界与交付
 
-仅请求方案时在对话中交付，不自动落盘。完整设计方案使用 [固定方案模板](references/design-plan-template.md)，由其唯一维护结构、字段和内容验收；用户只问局部选择时按明确范围回答，不自动展开完整方案。
+仅请求方案时在对话中交付，不自动落盘；用户只问局部选择时按明确范围回答，不自动展开完整方案。
+
+完整设计方案优先沿用用户指定格式或有效项目模板，没有时使用 [固定方案模板](references/design-plan-template.md)。沿用项目模板时只补充本次适用且未覆盖的设计内容，不重复填写两套；已有计划或会话可承载时不另建方案文件。
 
 已授权开发时交付受影响页面或组件及验证结果，不自动生成原型、重写 DESIGN 或创建过程报告。交付说明实际采用的设计依据、呈现与状态变化及未验证项。
 
@@ -89,4 +91,4 @@ description: 为新建、重构或局部修改页面与组件提供视觉和交�
 
 实现影响呈现或操作可达性的改动后，主动完成受影响范围的浏览器验证，不等待用户另行要求“审核页面”。读取 [前端验证规范](../frontend-ux-audit/references/frontend-verification.md)，按改动风险选场景、采集证据并判断完成条件；发现缺陷后在已授权范围内修复并复测。这是开发自审，不自动扩大为全站体验审核。检查发现和未验证项默认在回复中说明，用户要求保存过程记录时再落盘。
 
-完整方案落盘或整体重构后运行 `python3 <skills-root>/skill-authoring-standard/scripts/validate_document_template.py <方案路径> --template <本技能目录>/references/design-plan-template.md`；页面实现的浏览器验证仍执行上述要求。
+完整方案落盘或整体重构后，按实际采用模板的校验方式核对。使用本技能模板时运行 `python3 <skills-root>/skill-authoring-standard/scripts/validate_document_template.py <方案路径> --template <本技能目录>/references/design-plan-template.md`；项目模板没有适用检查器时按其必填内容核对，不套用本技能模板校验。项目门禁与页面实现的浏览器验证仍执行适用要求。
