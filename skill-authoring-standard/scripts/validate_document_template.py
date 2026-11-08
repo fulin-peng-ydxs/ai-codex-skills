@@ -234,6 +234,12 @@ class BodyBlock:
     identity: str | tuple[str, str] = ''
 
 
+def field_label_identity(label: str) -> str:
+    """Recognize disguised declared labels without accepting their syntax."""
+    label = re.sub(r'^[-+*]\s+', '', label.rstrip('：:').strip())
+    return label.strip(' \t*_`~')
+
+
 def body_blocks(lines: list[str], labels: set[str], *, template: bool,
                 anchors: list[str]) -> list[BodyBlock]:
     """Keep field ownership and declared block positions; headings belong to Node."""
@@ -241,6 +247,7 @@ def body_blocks(lines: list[str], labels: set[str], *, template: bool,
     tables = dict(table_headers(prose))
     fences = {block.start: block for block in code_fences(lines)}
     result = []
+    label_identities = {field_label_identity(label) for label in labels}
     owner = None
     index = 0
     while index < len(lines):
@@ -269,11 +276,17 @@ def body_blocks(lines: list[str], labels: set[str], *, template: bool,
             result.append(BodyBlock('slot', index, index + 1, owner))
         elif owner is None and line.strip() and any(title_matches(anchor, line.strip()) for anchor in anchors):
             result.append(BodyBlock('anchor', index, index + 1, identity=line.strip()))
+        elif (not template and labels and owner is None and not line.startswith('>')
+              and FIELD.match(line) and not ABSENT.fullmatch(line)):
+            # A colon is ordinary prose only where a standalone slot owns it.
+            # Alternate markup or punctuation cannot hide a declared field.
+            kind = 'field-variant' if field_label_identity(FIELD.match(line)[1]) in label_identities else 'prose'
+            result.append(BodyBlock(kind, index, index + 1))
         index += 1
     return result
 
 
-def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bool]:
+def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], set[int], bool]:
     """Match required blocks in order; only a real content slot consumes extras.
 
     A field slot owns its indented continuation. A standalone slot runs between
@@ -281,7 +294,7 @@ def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bo
     copy of a required outer table cannot replace the missing original.
     """
     prose = body_prose(expected.body)
-    labels = {match[1] for line in prose
+    labels = {match[1] for line in (prose if expected.level else [])
               if (match := FIELD.match(line)) and PLACEHOLDER.search(match[2])}
     # Literal lines only act as boundaries when the template declares a prose
     # slot; other prose keeps the existing validator's preservation behavior.
@@ -323,7 +336,7 @@ def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bo
                 return tail
             if offset < len(observed):
                 current = observed[offset]
-                if (current.kind in ('table', 'code') and current.owner == wanted.owner
+                if (current.kind in ('table', 'code', 'prose') and current.owner == wanted.owner
                         and (current.kind, current.owner, current.identity) not in reserved[position]):
                     tail = match(position, offset + 1)
                     if tail is not None:
@@ -340,9 +353,10 @@ def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], bo
 
     consumed = match(0, 0)
     if consumed is None:
-        return set(), set(), False
+        return set(), set(), set(), False
     return ({observed[i].start for i in consumed if observed[i].kind == 'table'},
-            {observed[i].start for i in consumed if observed[i].kind == 'code'}, True)
+            {observed[i].start for i in consumed if observed[i].kind == 'code'},
+            {observed[i].start for i in consumed if observed[i].kind == 'prose'}, True)
 
 
 def field_has_content(lines: list[str], index: int, value: str) -> bool:
@@ -359,7 +373,7 @@ def field_has_content(lines: list[str], index: int, value: str) -> bool:
 
 
 def check_body(expected: Node, actual: Node, where: str, flexible: bool = False) -> list[str]:
-    content_tables, content_code, matched = content_blocks(expected, actual) if not flexible else (set(), set(), True)
+    content_tables, content_code, content_prose, matched = content_blocks(expected, actual) if not flexible else (set(), set(), set(), True)
     errors = check_code(expected, actual, where, content_code)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
     actual_lines = body_prose(actual.body)
@@ -383,7 +397,7 @@ def check_body(expected: Node, actual: Node, where: str, flexible: bool = False)
             observed_fields.append((prefix, match[1]))
             if not field_has_content(actual.body, index, match[2]):
                 errors.append(f'{where}: empty field {match[1]}')
-        elif fields and match and not ABSENT.fullmatch(line):
+        elif fields and match and index not in content_prose and not ABSENT.fullmatch(line):
             errors.append(f'{where}: unexpected field {match[1]}')
     if observed_fields != fields:
         errors.append(f'{where}: fields missing, duplicated or out of order; expected {fields}, found {observed_fields}')

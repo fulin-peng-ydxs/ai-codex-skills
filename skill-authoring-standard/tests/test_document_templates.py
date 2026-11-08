@@ -956,6 +956,43 @@ class FixedDocumentTests(unittest.TestCase):
         free_contract = '```document-template\n# 说明\n\n## 机制\n{{@完整机制说明}}\n```'
         self.assertEqual([], check.validate('# 说明\n\n## 机制\n背景：这里是自由文本槽位。\n', free_contract))
 
+    def test_colon_prose_is_scoped_to_standalone_slots(self):
+        source = '''````document-template
+# 验收
+## 场景
+- 前置：{{@真实条件}}
+{{@按需展开步骤}}
+| 检查点 | 判据 |
+| --- | --- |
+| C1 | {{@结果要求}} |
+- 结果：{{@实际证据}}
+````'''
+        base = '# 验收\n## 场景\n- 前置：隔离环境。\n'
+        table = '| 检查点 | 判据 |\n| --- | --- |\n| C1 | 拒绝重复执行。 |\n'
+        end = '- 结果：尚未执行。\n'
+        for prose in ['说明如下：\n', '**C1：并发重试。**\n',
+                      '1. 核对两个请求：仅一个生效。\n', '- 失败分支：保留原结果。\n']:
+            with self.subTest(prose=prose):
+                self.assertEqual([], check.validate(base + prose + table + end, source))
+                # A declared slot is not a section-wide unknown-field exemption.
+                before_field = base.replace('- 前置：', prose + '- 前置：')
+                self.assertTrue(check.validate(before_field + table + end, source))
+                self.assertTrue(check.validate(base + table + prose + end, source))
+                self.assertTrue(check.validate(base + table + end + prose, source))
+        self.assertEqual([], check.validate(base + table + end, source))
+        good = base + '1. 核对请求：仅一个生效。\n' + table + end
+        for bad in [good.replace('- 前置：隔离环境。\n', ''),
+                    good.replace('1. 核对请求：仅一个生效。', '- 前置：重复条件。'),
+                    good.replace('- 结果：尚未执行。', '- 结果：'),
+                    good.replace(table, ''),
+                    good.replace('- 结果：尚未执行。', '- 错写结果：尚未执行。')]:
+            self.assertTrue(check.validate(bad, source))
+        for variant in ['**前置：另一组条件。**', '- **前置：**另一组条件。',
+                        '- 前置:另一组条件。', '* **前置**：另一组条件。',
+                        '`前置`：另一组条件。']:
+            with self.subTest(variant=variant):
+                self.assertTrue(check.validate(base + variant + '\n' + table + end, source))
+
     def test_audit_reports_require_priority_at_the_declared_position(self):
         for relative in ['frontend-ux-audit/references/output-template.md',
                          'design-compliance-audit/references/report-template.md']:
