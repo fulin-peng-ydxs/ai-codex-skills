@@ -453,8 +453,10 @@ class FixedDocumentTests(unittest.TestCase):
     def test_requirement_goal_absence_cannot_waive_missing_integration_acceptance(self):
         source = (ROOT / 'requirement-doc-authoring/references/requirement-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
-        good = good.replace('- 适用性：样例1\n- 流程与交接：样例1',
-                            '- 适用性：存在跨需求流程，必须集成验收。\n- 流程与交接：审批完成后交接执行任务。')
+        original = '- 适用性：样例1\n- 流程与交接：\n\n  样例1'
+        self.assertIn(original, good)
+        good = good.replace(original,
+                            '- 适用性：存在跨需求流程，必须集成验收。\n- 流程与交接：\n\n  审批完成后交接执行任务。')
         start, end = good.index('## 3.'), good.index('## 4.')
         lines = good[start:end].splitlines()
         tables = [index for index, _ in check.table_headers(lines)]
@@ -472,6 +474,18 @@ class FixedDocumentTests(unittest.TestCase):
         both_absent = good[:start] + '\n'.join(lines) + '\n\n' + good[end:]
         both_absent = both_absent.replace('存在跨需求流程，必须集成验收。', '不涉及跨需求流程或集成验收。')
         self.assertEqual([], check.validate(both_absent, source))
+
+    def test_requirement_without_pages_still_requires_its_acceptance(self):
+        source = (ROOT / 'requirement-doc-authoring/references/requirement-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        start, end = good.index('#### P'), good.index('#### 单项验收条件')
+        no_page = (good[:start] + good[end:]).replace(
+            '- 适用性：样例1', '- 适用性：不适用：纯后端需求，不涉及页面。', 1)
+        self.assertEqual([], check.validate(no_page, source))
+        unknown = no_page.replace('不适用：纯后端需求，不涉及页面。', '未知：页面范围尚未核实。', 1)
+        self.assertTrue(check.validate(unknown, source))
+        start, end = no_page.index('#### 单项验收条件'), no_page.index('## 3.')
+        self.assertTrue(check.validate(no_page[:start] + no_page[end:], source))
 
     def test_empty_tables_require_their_own_immediately_following_reason(self):
         source = '''```document-template
@@ -580,11 +594,14 @@ class FixedDocumentTests(unittest.TestCase):
         absent = good[:start] + '条目情况：不适用：隔离查询场景不维护对象状态。\n\n' + good[end:]
         self.assertEqual([], check.validate(absent, source))
         self.assertTrue(check.validate(good[:start] + good[end:], source))
-        unknown = good.replace('- 状态语义与联动：样例1', '- 状态语义与联动：未知：缺少状态来源，无法确认终态；取得源码后补证。')
+        state_field = '- 状态语义与联动：\n\n  样例1\n'
+        self.assertIn(state_field, good)
+        unknown = good.replace(state_field, '- 状态语义与联动：\n\n  未知：缺少状态来源，无法确认终态；取得源码后补证。\n')
         self.assertEqual([], check.validate(unknown, source))
         for bad in [good[:start] + first + first + good[end:],
-                    two.replace('- 状态语义与联动：样例1\n', '', 1),
+                    two.replace(state_field, '', 1),
                     two.replace('| 当前状态 |', '| 自定义状态 |', 1)]:
+            self.assertNotEqual(two, bad)
             self.assertTrue(check.validate(bad, source))
         # The former output put a second bare state table in the parent section.
         table = unit[unit.index('| 当前状态 |'):]
