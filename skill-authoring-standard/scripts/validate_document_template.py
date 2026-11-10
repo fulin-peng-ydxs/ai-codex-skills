@@ -186,6 +186,21 @@ def body_prose(lines: list[str]) -> list[str]:
     return [line if kind == 'prose' else '' for line, kind in fenced_lines('\n'.join(lines))]
 
 
+def declared_fields(lines: list[str]) -> list[tuple[str, str]]:
+    """Recognize inline slots and indented block-only slots as the same field."""
+    prose = body_prose(lines)
+    fields = []
+    for index, line in enumerate(prose):
+        if line[:1].isspace() or not (match := FIELD.match(line)):
+            continue
+        following = next((value for value in prose[index + 1:] if value.strip()), '')
+        block_slot = (not match[2].strip() and following.startswith('  ')
+                      and PLACEHOLDER.fullmatch(following.strip()))
+        if PLACEHOLDER.search(match[2]) or block_slot:
+            fields.append(('- ' if line.startswith('- ') else '', match[1]))
+    return fields
+
+
 def table_absences(body: list[str], prose: list[str]) -> dict[int, int]:
     """Bind a reason only to the empty table immediately before it."""
     bindings = {}
@@ -294,8 +309,7 @@ def content_blocks(expected: Node, actual: Node) -> tuple[set[int], set[int], se
     copy of a required outer table cannot replace the missing original.
     """
     prose = body_prose(expected.body)
-    labels = {match[1] for line in (prose if expected.level else [])
-              if (match := FIELD.match(line)) and PLACEHOLDER.search(match[2])}
+    labels = {label for _, label in declared_fields(expected.body)} if expected.level else set()
     # Literal lines only act as boundaries when the template declares a prose
     # slot; other prose keeps the existing validator's preservation behavior.
     anchors = []
@@ -377,13 +391,9 @@ def check_body(expected: Node, actual: Node, where: str, flexible: bool = False)
     errors = check_code(expected, actual, where, content_code)
     expected_lines = prose_without_fences('\n'.join(expected.body)).splitlines()
     actual_lines = body_prose(actual.body)
-    fields = []
     # Frontmatter belongs to the artifact's machine contract (e.g. skill-creator),
     # rather than the Markdown field namespace below its first heading.
-    for line in expected_lines if expected.level else []:
-        match = FIELD.match(line.strip())
-        if match and PLACEHOLDER.search(match[2]):
-            fields.append(('- ' if line.startswith('- ') else '', match[1]))
+    fields = declared_fields(expected.body) if expected.level else []
     labels = {label for _, label in fields}
     observed_fields = []
     for index, line in enumerate(actual_lines):

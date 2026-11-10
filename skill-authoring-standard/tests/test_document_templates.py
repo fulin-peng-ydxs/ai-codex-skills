@@ -144,6 +144,73 @@ class FixedDocumentTests(unittest.TestCase):
         plain = '# 单位\n\n## 事实\n成员：\n\n' + table + '\n验证：未实测。\n'
         self.assertEqual([], check.validate(plain, plain_source))
 
+    def test_multiline_field_declarations_preserve_required_field_checks(self):
+        for prefix in ['- ', '']:
+            for colon in ['：', ':']:
+                with self.subTest(prefix=prefix, colon=colon):
+                    a, b = prefix + '方案' + colon, prefix + '状态' + colon
+                    source = ('````document-template\n# 对照\n\n## 正文\n'
+                              + a + '\n\n  {{@实现方案}}\n\n'
+                              + b + '{{@当前状态}}\n````')
+                    first = a + '\n\n  实现内容与依据。\n'
+                    second = b + '待实施\n'
+                    head = '# 对照\n\n## 正文\n'
+                    good = head + first + '\n' + second
+                    self.assertEqual([], check.validate(good, source))
+                    # Declaration layout does not add a new output-format gate.
+                    self.assertEqual([], check.validate(head + a + '内容。\n' + second, source))
+                    rich = (a + '\n\n  1. 核验前置条件。\n  2. 执行后检查结果。\n\n'
+                            '  失败处理：停止后续步骤。\n\n'
+                            '  | 对象 | 判据 |\n  | --- | --- |\n  | A | 状态一致 |\n\n'
+                            '  ```bash\n  printf example\n  ```\n')
+                    self.assertEqual([], check.validate(head + rich + second, source))
+                    bad = {
+                        'empty': head + a + '\n\n' + second,
+                        'missing': head + second,
+                        'duplicate': head + first + first + second,
+                        'order': head + second + first,
+                        'unknown': head + first + '- 额外字段：内容\n' + second,
+                        'unowned': head + a + '\n\n未缩进内容。\n' + second,
+                        'unfilled': head + a + '\n\n  {{@未填写}}\n' + second,
+                        'empty-code': head + a + '\n\n  ```bash\n  ```\n' + second,
+                        'unclosed-code': head + a + '\n\n  ```bash\n  printf example\n' + second,
+                    }
+                    if prefix:
+                        bad['style'] = head + first.replace('- 方案', '方案', 1) + second
+                    for name, document in bad.items():
+                        with self.subTest(case=name):
+                            self.assertTrue(check.validate(document, source), name)
+
+    def test_multiline_field_slots_preserve_declared_block_ownership(self):
+        source = '''````document-template
+# 对照
+
+## 正文
+- 方案：
+
+  {{@说明}}
+
+  | 对象 | 判据 |
+  | --- | --- |
+  | {{@对象}} | {{@判据}} |
+
+  ```bash
+  {{@命令}}
+  ```
+- 结果：
+
+  {{@结果说明}}
+````'''
+        good = filled(check.template_blocks(source)['document'])
+        self.assertEqual([], check.validate(good, source))
+        table = '  | 对象 | 判据 |\n  | --- | --- |\n  | 样例1 | 样例1 |\n'
+        code = '  ```bash\n  样例1\n  ```\n'
+        for block in [table, code]:
+            self.assertIn(block, good)
+            self.assertTrue(check.validate(good.replace(block, '', 1), source))
+            moved = good.replace(block, '', 1).replace('- 结果：', '- 结果：\n\n' + block, 1)
+            self.assertTrue(check.validate(moved, source))
+
     def test_standalone_slots_accept_mixed_blocks_between_fixed_anchors(self):
         source = '''````document-template
 # 对照
@@ -311,8 +378,9 @@ class FixedDocumentTests(unittest.TestCase):
                 source = (ROOT / path).read_text()
                 skeleton = check.template_blocks(source)['document']
                 good = filled(skeleton)
-                original = f'- {field}：样例1'
-                self.assertIn(original, good)
+                original = re.search(r'^- ' + re.escape(field) + r'：(样例1|\n\n  样例1)', good, re.M)
+                self.assertIsNotNone(original)
+                original = original[0]
                 expanded = f'''- {field}：隔离格式样例，不代表实际项目事实。
   1. 校验身份和必填项后提交；缺项时保留原内容并提示原因，检查状态不变。
   2. 更新状态并创建唯一任务；失败时回滚，重复请求返回原结果，判据是只产生一个任务。尚未运行验证。
@@ -325,12 +393,10 @@ class FixedDocumentTests(unittest.TestCase):
                 self.assertEqual([], check.validate(good.replace(original, f'- {field}：未知：缺少接口或源码依据，影响判断；补齐后再复核。', 1), source))
                 unit = find(check.parse_tree(skeleton, True), prefix)
                 self.assertIsNotNone(unit)
-                for line in unit.body:
-                    match = check.FIELD.match(line)
-                    if match and check.PLACEHOLDER.search(match[2]):
-                        missing = re.sub(r'^(?:- )?' + re.escape(match[1]) + r'.*\n', '', good, count=1, flags=re.M)
-                        self.assertTrue(good != missing, match[1])
-                        self.assertTrue(check.validate(missing, source), match[1])
+                for _, label in check.declared_fields(unit.body):
+                    missing = re.sub(r'^(?:- )?' + re.escape(label) + r'.*\n', '', good, count=1, flags=re.M)
+                    self.assertTrue(good != missing, label)
+                    self.assertTrue(check.validate(missing, source), label)
                 self.assertTrue(check.validate(document.replace(expanded, expanded + '\n##### 临时子标题\n额外内容。', 1), source))
                 self.assertTrue(check.validate(document.replace(expanded, expanded + '\n| 临时列 | 内容 |\n| --- | --- |\n| A | B |', 1), source))
 
@@ -586,9 +652,14 @@ class FixedDocumentTests(unittest.TestCase):
     def test_plan_consumes_reuse_analysis_in_its_own_fields(self):
         source = (ROOT / 'development-workflow/references/output-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
-        good = good.replace('- 实施方案：样例1', '- 实施方案：复用已有筛选入口；隔离样例定位为 existing/filter.ts。\n  候选筛选状态：已比较旧、新页面的共同变化点；保留各自的数据请求。')
-        good = good.replace('- 影响与保持项：样例1', '- 影响与保持项：旧、新消费者共同接入，迁移步骤纳入当前任务；保留提交行为。')
-        good = good.replace('- 完成条件：样例1', '- 完成条件：验证两处消费者及项目要求的登记维护。')
+        for label, value in [
+            ('实施方案', '复用已有筛选入口；隔离样例定位为 existing/filter.ts。\n  候选筛选状态：已比较旧、新页面的共同变化点；保留各自的数据请求。'),
+            ('影响与保持项', '旧、新消费者共同接入，迁移步骤纳入当前任务；保留提交行为。'),
+            ('完成条件', '验证两处消费者及项目要求的登记维护。'),
+        ]:
+            original = f'- {label}：\n\n  样例1'
+            self.assertIn(original, good)
+            good = good.replace(original, f'- {label}：\n\n  {value}', 1)
         self.assertEqual([], check.validate(good, source))
         snippet = '### 共用筛选状态\n- 现状与依据：已比较两处。\n- 判断与边界：复用已有入口。\n- 消费方与处理：迁移两处。\n- 验证与维护：安排回归。\n\n'
         self.assertTrue(check.validate(good.replace('## 3. 验收与交付', snippet + '## 3. 验收与交付'), source))
