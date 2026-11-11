@@ -19,13 +19,20 @@ from contextlib import ExitStack
 from pathlib import Path
 
 
+# Share fence recognition with the template validators; do not maintain a
+# second Markdown grammar in this synchronizer.
+_parser_dir = Path(__file__).resolve().parents[2] / "ai-constraint-doc-authoring/scripts"
+if not (_parser_dir / "document_markdown.py").is_file():
+    raise SystemExit("Missing dependency: install ai-constraint-doc-authoring beside this skill.")
+sys.path.insert(0, str(_parser_dir))
+from document_markdown import fenced_lines
+
+
 STATE_FILE = ".codex-skill-sync.json"
 RETIREMENTS = Path(__file__).resolve().parents[1] / "references/retired-skills.json"
 
 CODEX_ONLY_SKILLS = {"automation-management", "config-codex-sync"}
-# Only audited portable dependencies may leave the normally ignored system tree.
-PORTABLE_SYSTEM_DEPENDENCIES = {"skill-creator"}
-SYSTEM_LINK = re.compile(r"\]\(((?:\.\./)+)\.system/([a-z0-9-]+)/([^\s)#]+)(#[^\s)]*)?\)")
+LOCAL_LINK = re.compile(r"\]\((<[^>\n]+>|[^\s)]+)\)")
 
 
 IGNORED_NAMES = {
@@ -98,6 +105,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--origin-root", type=expand_path, help="稳定的完整 Codex 根目录；使用临时适配源时必须指定。")
     parser.add_argument("--partial", action="store_true", help="仅同步所选技能，不据缺失推断整项退役。")
+    parser.add_argument(
+        "--scope", choices=("skills", "document", "all"),
+        help="同步技能、协作文档或两者；默认全量同步两者，--partial 默认仅技能。",
+    )
     return parser.parse_args()
 
 
@@ -109,12 +120,12 @@ def is_relative_to(path: Path, parent: Path) -> bool:
         return False
 
 
-def validate_paths(source_root: Path, targets: list[tuple[str, Path]]) -> None:
+def validate_paths(source_root: Path, targets: list[tuple[str, Path]], scope: str = "all") -> None:
     source_skills = source_root / "skills"
     source_agents = source_root / "AGENTS.md"
-    if not source_skills.is_dir():
+    if scope != "document" and not source_skills.is_dir():
         raise SyncError(f"Codex skills 目录不存在：{source_skills}")
-    if not source_agents.is_file():
+    if scope != "skills" and not source_agents.is_file():
         raise SyncError(f"Codex AGENTS.md 不存在：{source_agents}")
 
     for label, target_root in targets:
@@ -125,7 +136,7 @@ def validate_paths(source_root: Path, targets: list[tuple[str, Path]]) -> None:
         if target_root.exists() and not target_root.is_dir():
             raise SyncError(f"{label} 根路径不是目录：{target_root}")
         target_skills = target_root / "skills"
-        if target_skills.is_symlink():
+        if scope != "document" and target_skills.is_symlink():
             raise SyncError(f"目标 skills 不得为符号链接：{target_skills}")
         if is_relative_to(source_root, target_root) or is_relative_to(target_root, source_root):
             raise SyncError(f"源与目标不能互相嵌套：{source_root} -> {target_root}")
@@ -387,62 +398,140 @@ def discover_skills(skills_root: Path) -> tuple[list[Path], list[Path]]:
     return skills, excluded_skills
 
 
-def prepare_target_skills(source: Path, origin: Path, target: Path, staging: Path) -> list[str]:
-    """Stage selected skills and explicit portable dependencies without editing Codex.
-
-    Dependencies are installed as ordinary siblings so the existing inventory,
-    conflict preflight and deletion baselines apply to them as well.
-    """
+def prepare_target_skills(source: Path, origin: Path, target: Path, staging: Path,
+                          references: set[Path] | None = None) -> list[str]:
+    """Stage user skills; resolve references without copying any system skills."""
     skills, _ = discover_skills(source)
     selected = {skill.name: skill for skill in skills}
-    pending = list(skills)
     dependencies = set()
-    while pending:
-        skill = pending.pop()
+    references = references if references is not None else set()
+
+    def installed_path(path: Path) -> Path:
+        """Map ordinary resources to Claude; system resources stay at the origin."""
+        if ".system" in path.parts and ".." in path.parts[path.parts.index(".system") + 1:]:
+            raise SyncError(f"系统引用越界：{path}")
+        path = Path(os.path.abspath(path))
+        relative = None
+        for base in (source, origin, target / "skills"):
+            if is_relative_to(path, base):
+                relative = path.relative_to(base)
+                break
+        if relative is None:
+            if not path.exists():
+                raise SyncError(f"共享引用不存在：{path}")
+            resolved = path.resolve()
+            references.add(resolved)
+            return resolved
+        if relative.parts and relative.parts[0] == ".system":
+            canonical = origin / relative
+            if (len(relative.parts) < 3 or not canonical.exists()
+                    or not is_relative_to(canonical.resolve(), (origin / '.system').resolve())
+                    or any(part.is_symlink() for part in [canonical, *canonical.parents]
+                           if is_relative_to(part, origin))):
+                raise SyncError(f"系统引用缺失、越界或含符号链接：{canonical}")
+            dependencies.add(relative.parts[1])
+            references.add(canonical.resolve())
+            return canonical.resolve()
+        destination = target / "skills" / relative
+        available = staging / relative if not relative.parts or relative.parts[0] in selected else destination
+        if not available.exists():
+            raise SyncError(f"目标依赖未安装或不在本次范围：{destination}")
+        references.add(destination)
+        return destination
+
+    for skill in skills:
+        sync_entry(skill, staging / skill.name, False)
+    for skill in skills:
         destination = staging / skill.name
-        sync_entry(skill, destination, False)
         documents = [destination] if destination.is_file() else destination.rglob("*.md")
         for document in documents:
             if document.is_symlink():
                 continue
             content = document.read_text(encoding="utf-8")
-
+            source_document = source / document.relative_to(staging)
             def adapt_link(match):
-                name, resource, anchor = match.group(2), match.group(3), match.group(4) or ""
-                dependency = origin / ".system" / name
-                referenced = dependency / resource
-                if name not in PORTABLE_SYSTEM_DEPENDENCIES:
-                    raise SyncError(f"系统依赖尚未核实可移植性：{name}")
-                if (dependency.is_symlink() or not (dependency / "SKILL.md").is_file()
-                        or not referenced.is_file() or referenced.is_symlink()
-                        or not is_relative_to(referenced.resolve(), dependency.resolve())
-                        or is_excluded_mcp_skill(dependency) or is_codex_only_skill(dependency)):
-                    raise SyncError(f"系统依赖缺失或不允许同步：{referenced}")
-                if name in selected and selected[name] != dependency:
-                    raise SyncError(f"系统依赖与所选同名技能冲突：{name}")
-                if name not in selected:
-                    selected[name] = dependency
-                    pending.append(dependency)
-                    dependencies.add(name)
-                relative = os.path.relpath(staging / name / resource, document.parent)
-                return f"]({relative}{anchor})"
+                raw = match.group(1).strip("<>")
+                resource, separator, anchor = raw.partition("#")
+                if not resource or re.match(r"[a-zA-Z][a-zA-Z0-9+.-]*:", resource):
+                    return match.group(0)
+                path = Path(resource).expanduser()
+                if not path.is_absolute():
+                    path = source_document.parent / path
+                if ".system/" in resource and ".." in Path(resource.split('.system/', 1)[1]).parts:
+                    raise SyncError(f"系统引用越界：{source_document}")
+                resolved = str(installed_path(path)) + (separator + anchor if separator else "")
+                return f"](<{resolved}>)" if re.search(r"[\s()]", resolved) else f"]({resolved})"
 
-            adapted = SYSTEM_LINK.sub(adapt_link, content)
-            if skill.name in dependencies and document == destination / "SKILL.md":
-                # The provider's output defaults are executable guidance; preserve
-                # its rules and examples while moving only their installation root.
-                root = str(target)
-                shell_path = shlex.quote(str(target / "skills"))
-                if is_relative_to(target, Path.home()):
-                    root = "~/" + target.relative_to(Path.home()).as_posix()
-                    shell_path = '"$HOME"/' + shlex.quote((target.relative_to(Path.home()) / "skills").as_posix())
-                adapted = adapted.replace('"${CODEX_HOME:-$HOME/.codex}/skills"', shell_path)
-                adapted = adapted.replace('`$CODEX_HOME/skills`, or `~/.codex/skills` when `CODEX_HOME` is unset', '`' + root + '/skills`')
-                if "CODEX_HOME" in adapted or "~/.codex/skills" in adapted:
-                    raise SyncError(f"系统依赖出现未适配的源端目录：{skill.name}")
+            # These placeholders explicitly denote runtime paths, not comparative
+            # prose about Codex defaults. Do not globally replace tool names/paths.
+            pattern = re.compile(r'''(?P<quote>["']?)(?P<root><skills-root>|<本技能目录>)(?P<tail>/[A-Za-z0-9_./-]+)?(?P=quote)''')
+            def adapt_command(match):
+                base = origin if match.group("root") == "<skills-root>" else source / skill.name
+                path = base / (match.group("tail") or "").lstrip("/")
+                resolved = str(installed_path(path))
+                return shlex.quote(resolved)
+            adapted = adapt_markdown_paths(content, adapt_link, lambda text: pattern.sub(adapt_command, text))
             if adapted != content:
                 document.write_text(adapted, encoding="utf-8")
     return sorted(dependencies)
+
+
+def adapt_markdown_paths(content: str, adapt_link, adapt_commands) -> str:
+    """Rewrite executable references without interpreting literal examples.
+
+    Prose links are live references. Inline Markdown examples and non-shell
+    fences (including document-template/text-verbatim wrappers) remain literal.
+    Shell fences and ordinary inline commands retain runtime path adaptation.
+    """
+    result = []
+    prose = []
+    fence_info = None
+
+    def flush_prose():
+        # Code spans close with exactly the same backtick count and may span
+        # lines or contain shorter runs. Preserve the original delimiters/text.
+        block = "".join(prose)
+        cursor = search = 0
+        while search < len(block):
+            opening = re.search(r"(?<!`)(`+)(?!`)", block[search:])
+            if opening is None:
+                break
+            start, end = search + opening.start(), search + opening.end()
+            preceding = block[:start]
+            if (len(preceding) - len(preceding.rstrip("\\"))) % 2:
+                search = end
+                continue
+            closing = re.search(r"(?<!`)" + re.escape(opening[1]) + r"(?!`)", block[end:])
+            if closing is None:
+                search = end
+                continue
+            finish = end + closing.end()
+            result.append(adapt_commands(LOCAL_LINK.sub(adapt_link, block[cursor:start])))
+            span = block[start:finish]
+            result.append(span if LOCAL_LINK.search(span) else adapt_commands(span))
+            cursor = search = finish
+        result.append(adapt_commands(LOCAL_LINK.sub(adapt_link, block[cursor:])))
+        prose.clear()
+
+    original_lines = content.splitlines(keepends=True)
+    for original, (line, kind) in zip(original_lines, fenced_lines(content, field_continuations=True)):
+        if kind == "marker":
+            flush_prose()
+            fence_info = re.match(r"^\s*(?:`+|~+)(.*)$", line)[1].strip() if fence_info is None else None
+            result.append(original)
+        elif kind == "code":
+            result.append(adapt_commands(original) if fence_info in {"sh", "bash", "shell", "zsh"} else original)
+        else:
+            prose.append(original)
+    flush_prose()
+    return "".join(result)
+
+
+def validate_retained_references(references: set[Path], deletions: list[Path]) -> None:
+    """Validate against the projected result, before any write or deletion."""
+    for reference in sorted(references):
+        if any(reference == removed or is_relative_to(reference, removed) for removed in deletions):
+            raise SyncError(f"同步后的依赖将被本轮删除：{reference}；请先更新引用或保留依赖")
 
 
 def destination_kind_conflicts(source: Path, destination: Path) -> bool:
@@ -539,13 +628,24 @@ def target_document_name(label: str) -> str:
 
 def run_sync(args: argparse.Namespace, targets: list[tuple[str, Path]], stack: ExitStack) -> int:
     try:
-        validate_paths(args.codex_root, targets)
+        # Partial selection must not silently authorize a global document write.
+        scope = args.scope or ("skills" if args.partial else "all")
+        if scope == "document" and (args.partial or args.delete):
+            raise SyncError("仅同步协作文档不能使用 --partial 或 --delete")
+        validate_paths(args.codex_root, targets, scope)
+        source_agents = args.codex_root / "AGENTS.md"
+        if scope == "document":
+            for label, target_root in targets:
+                sync_document(source_agents, target_root / target_document_name(label), True)
+            for label, target_root in targets:
+                status = sync_document(source_agents, target_root / target_document_name(label), args.dry_run)
+                print(f"{'预览' if args.dry_run else '执行'}：{label} 协作文档 {status}；源 {source_agents}；目标 {target_root / target_document_name(label)}")
+            return 0
         origin = args.origin_root or args.codex_root
         if not (origin / "skills").is_dir():
             raise SyncError("完整源目录不存在")
         origin_skills, _ = discover_skills(origin / "skills")
         source_skills_root = args.codex_root / "skills"
-        source_agents = args.codex_root / "AGENTS.md"
         skills, excluded_skills = discover_skills(source_skills_root)
         if not skills:
             raise SyncError(f"未发现可同步技能：{source_skills_root}")
@@ -561,10 +661,11 @@ def run_sync(args: argparse.Namespace, targets: list[tuple[str, Path]], stack: E
                             else Path(tempfile.gettempdir()) / "ai-agent/codex-skills")
         temporary_parent.mkdir(parents=True, exist_ok=True)
         temporary = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="config-codex-sync-", dir=temporary_parent)))
-        prepared, dependencies = {}, {}
+        prepared, dependencies, references = {}, {}, {}
         for label, target_root in targets:
             staging = temporary / label / "skills"
-            dependencies[label] = prepare_target_skills(source_skills_root, origin / "skills", target_root, staging)
+            references[label] = set()
+            dependencies[label] = prepare_target_skills(source_skills_root, origin / "skills", target_root, staging, references[label])
             prepared[label] = staging
         retirements = load_retirements()
         states, conflicts, retired, guards = {}, {}, {}, {}
@@ -574,15 +675,18 @@ def run_sync(args: argparse.Namespace, targets: list[tuple[str, Path]], stack: E
             target_skills, _ = discover_skills(prepared[label])
             for skill in target_skills:
                 sync_entry(skill, target_root / "skills" / skill.name, True)
-            sync_document(source_agents, target_root / target_document_name(label), True)
+            if scope == "all":
+                sync_document(source_agents, target_root / target_document_name(label), True)
             states[label] = load_state(target_root, origin)
             if args.delete:
                 deletion_plans[label], conflicts[label], retired[label], guards[label] = managed_deletions(prepared[label], target_root / "skills", states[label], retirements, args.partial, origin / "skills")
             else:
                 deletion_plans[label], conflicts[label], retired[label], guards[label] = [], [], set(), {}
+            validate_retained_references(references[label], deletion_plans[label])
 
         mode = "预览" if args.dry_run else "执行"
         print(f"模式：{mode}")
+        print(f"同步范围：{scope}")
         print(f"Codex 源：{args.codex_root}")
         print(f"发现技能：{len(skills)}")
         print(f"同步方式：{'按管理清单清理（含退役技能）' if args.delete else '增量（保留目标独有项）'}")
@@ -593,7 +697,7 @@ def run_sync(args: argparse.Namespace, targets: list[tuple[str, Path]], stack: E
         for label, target_root in targets:
             skills, _ = discover_skills(prepared[label])
             if dependencies[label]:
-                print(f"{label} 系统依赖（已适配引用与输出目录）：{'、'.join(dependencies[label])}")
+                print(f"{label} 外部系统依赖（仅引用 Codex 绝对路径，不复制）：{'、'.join(dependencies[label])}")
             for path in deletion_plans[label]:
                 print(f"{label} 待删除：{path}")
             for conflict in conflicts[label]:
@@ -616,7 +720,7 @@ def run_sync(args: argparse.Namespace, targets: list[tuple[str, Path]], stack: E
             document_name = target_document_name(label)
             document_status = sync_document(
                 source_agents, target_root / document_name, args.dry_run
-            )
+            ) if scope == "all" else "未纳入同步"
             if not args.dry_run:
                 # Recheck immediately before removal, after synchronization writes.
                 for path, snapshot in guards[label].items():

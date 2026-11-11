@@ -114,7 +114,8 @@ def candidate_settings(cfg: dict[str, Any], project: Path, server_name: str) -> 
 
 
 def discover_candidates(project: Path) -> list[Candidate]:
-    by_command: dict[str, Candidate] = {}
+    # A shared launcher (npx/python/etc.) is not a service identity.
+    candidates: list[Candidate] = []
     mcp_json = project / ".mcp.json"
     if mcp_json.exists():
         data = json.loads(mcp_json.read_text(encoding="utf-8"))
@@ -135,18 +136,20 @@ def discover_candidates(project: Path) -> list[Candidate]:
                 source=".mcp.json",
                 settings=candidate_settings(cfg, project, name),
             )
-            by_command[command_identity(candidate.command)] = candidate
+            candidates.append(candidate)
 
     mcp_dir = project / ".codex-mcp"
     if mcp_dir.exists():
         for run_sh in sorted(mcp_dir.glob("*/run.sh")):
             command = str(run_sh.resolve())
             identity = command_identity(command)
-            if identity not in by_command:
+            if not any(command_identity(item.command) == identity for item in candidates):
                 name = f"{project.name}-{run_sh.parent.name}".replace("_", "-")
-                by_command[identity] = Candidate(name=name, command=command, source=".codex-mcp")
+                candidates.append(Candidate(name=name, command=command, source=".codex-mcp"))
 
-    return sorted(by_command.values(), key=lambda candidate: candidate.name)
+    if len({item.name for item in candidates}) != len(candidates):
+        raise ValueError("项目候选服务名称冲突，请在 .mcp.json 中为启动入口指定不同名称")
+    return sorted(candidates, key=lambda candidate: candidate.name)
 
 
 def parse_registrations(config_text: str) -> dict[str, Registration]:
@@ -161,6 +164,8 @@ def parse_registrations(config_text: str) -> dict[str, Registration]:
             continue
         command = cfg.get("command")
         if not isinstance(command, str):
+            # Reserve HTTP/other registration names without treating them as stdio.
+            registrations[name] = Registration(name=name, command="", settings=dict(cfg))
             continue
         settings = {key: value for key, value in cfg.items() if key not in {"command", "url"}}
         registrations[name] = Registration(
@@ -171,11 +176,11 @@ def parse_registrations(config_text: str) -> dict[str, Registration]:
     return registrations
 
 
-def unique_name(preferred: str, project_name: str, registrations: dict[str, Registration]) -> str:
-    clean = preferred.replace("_", "-")
+def unique_name(preferred: str, project_name: str, registrations: set[str]) -> str:
+    clean = preferred
     if clean not in registrations:
         return clean
-    prefixed = f"{project_name}-{clean}".replace("_", "-")
+    prefixed = f"{project_name}-{clean}"
     if prefixed not in registrations:
         return prefixed
     index = 2
@@ -193,44 +198,123 @@ def merge_candidate(existing: Registration, candidate: Candidate) -> Registratio
     return Registration(name=existing.name, command=candidate.command, settings=settings)
 
 
-def registration_for_candidate(
-    candidate: Candidate,
-    registrations: dict[str, Registration],
-) -> Registration | None:
-    named = registrations.get(candidate.name)
-    if named and command_identity(named.command) == command_identity(candidate.command):
-        return named
-    identity = command_identity(candidate.command)
-    return next(
-        (registration for registration in registrations.values() if command_identity(registration.command) == identity),
-        None,
-    )
+def same_launch(candidate: Candidate, registration: Registration) -> bool:
+    """Use the full launch description only to disambiguate known name aliases."""
+    defaults = {"args": [], "env": {}, "env_vars": []}
+    return (command_identity(candidate.command) == command_identity(registration.command)
+            and all(candidate.settings.get(key, defaults.get(key))
+                    == registration.settings.get(key, defaults.get(key))
+                    for key in MANAGED_STDIO_KEYS))
+
+
+def match_registrations(candidates: list[Candidate], registrations: dict[str, Registration],
+                        project_name: str) -> dict[str, str]:
+    """Resolve an injective mapping against the original snapshot, before writes.
+
+    Exact declared names take precedence. Legacy underscore normalization and
+    generated project prefixes are aliases, not proof of ownership when shared.
+    Ambiguous aliases fail closed rather than merging candidates or duplicating
+    an existing service under a new name.
+    """
+    matches = {}
+    for candidate in candidates:
+        named = registrations.get(candidate.name)
+        if named and command_identity(named.command) == command_identity(candidate.command):
+            matches[candidate.name] = named.name
+    claimed = set(matches.values())
+    declared = {item.name for item in candidates}
+    pending = {item.name: item for item in candidates if item.name not in matches}
+    options = {}
+    blocked_legacy = set()
+    for name, candidate in pending.items():
+        legacy = name.replace("_", "-")
+        prefixes = {f"{project_name}-{name}", f"{project_name}-{name}".replace("_", "-")}
+        options[name] = set()
+        for key, registration in registrations.items():
+            if command_identity(candidate.command) != command_identity(registration.command):
+                continue
+            if legacy != name and key == legacy and key in claimed:
+                blocked_legacy.add(name)
+            alias = key == legacy or any(
+                re.fullmatch(re.escape(prefix) + r"(?:-(?:[2-9]|[1-9]\d+))?", key)
+                for prefix in prefixes
+            )
+            if alias and key not in claimed and key not in declared:
+                options[name].add(key)
+
+    # Full launch equality can establish which candidate owns a shared alias.
+    for key in set().union(*options.values()) if options else set():
+        owners = [name for name in options if key in options[name]]
+        exact = [name for name in owners if same_launch(pending[name], registrations[key])]
+        if len(exact) == 1:
+            for name in set(owners) - set(exact):
+                options[name].discard(key)
+    for name, choices in options.items():
+        exact = {key for key in choices if same_launch(pending[name], registrations[key])}
+        if exact:
+            options[name] = exact
+        if not options[name] and name in blocked_legacy:
+            raise ValueError(f"历史注册名称归属冲突：{name}；请先明确服务名称")
+
+    unresolved = {name: choices for name, choices in options.items() if choices}
+    while unresolved:
+        singles = {name: next(iter(choices)) for name, choices in unresolved.items() if len(choices) == 1}
+        if not singles or len(set(singles.values())) != len(singles):
+            raise ValueError("MCP 注册别名归属不唯一，请明确冲突服务名称后重试")
+        matches.update(singles)
+        used = set(singles.values())
+        for name in singles:
+            del unresolved[name]
+        for choices in unresolved.values():
+            choices.difference_update(used)
+            if not choices:
+                raise ValueError("多个 MCP 候选竞争同一注册，请明确服务名称后重试")
+    return matches
 
 
 def plan_registrations(
     candidates: list[Candidate],
     registrations: dict[str, Registration],
     project_name: str,
-) -> tuple[list[Registration], list[Registration]]:
+) -> tuple[list[Registration], list[Registration], list[Registration]]:
     additions: list[Registration] = []
     updates: list[Registration] = []
+    project_regs: list[Registration] = []
+    candidate_names = {item.name for item in candidates}
+    if len(candidate_names) != len(candidates):
+        raise ValueError("MCP 候选名称重复")
+    matches = match_registrations(candidates, registrations, project_name)
+    # Reserve every candidate's generated base, not just its declared name.
+    bases = {f"{project_name}-{name}" for name in candidate_names}
+    reserved = candidate_names | bases | {name.replace("_", "-") for name in candidate_names | bases}
+    planned = dict(registrations)
 
     for candidate in candidates:
-        existing = registration_for_candidate(candidate, registrations)
+        existing = registrations[matches[candidate.name]] if candidate.name in matches else None
         if existing is not None:
             if candidate.source == ".mcp.json":
                 desired = merge_candidate(existing, candidate)
                 if desired.command != existing.command or desired.settings != existing.settings:
-                    registrations[existing.name] = desired
+                    planned[existing.name] = desired
                     updates.append(desired)
+            project_regs.append(planned[existing.name])
             continue
 
-        name = unique_name(candidate.name, project_name, registrations)
+        own_names = {candidate.name}
+        if f"{project_name}-{candidate.name}" not in candidate_names:
+            own_names.add(f"{project_name}-{candidate.name}")
+        unavailable = (reserved - own_names) | set(planned)
+        name = unique_name(candidate.name, project_name, unavailable)
         registration = Registration(name=name, command=candidate.command, settings=dict(candidate.settings))
-        registrations[name] = registration
+        planned[name] = registration
         additions.append(registration)
+        project_regs.append(registration)
 
-    return additions, updates
+    if (len({item.name for item in project_regs}) != len(candidates)
+            or {item.name for item in additions} & {item.name for item in updates}):
+        raise ValueError("MCP 注册计划不是一对一映射，未写入配置")
+    registrations.update(planned)
+    return additions, updates, project_regs
 
 
 def toml_key(value: str) -> str:
@@ -369,16 +453,21 @@ def validate_registration(registration: Registration, timeout_seconds: float) ->
     if cwd is None and (os.sep in executable or Path(executable).is_absolute()):
         cwd = str(Path(executable).parent)
 
-    proc = subprocess.Popen(
-        [executable, *args],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        cwd=cwd,
-        env=env,
-    )
+    proc = None
+    stage = "启动"
     try:
+        # Untrusted service diagnostics can contain credentials. Discard stderr
+        # rather than attempting an incomplete pattern-based secret scrubber.
+        proc = subprocess.Popen(
+            [executable, *args],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            cwd=cwd,
+            env=env,
+        )
+        stage = "initialize"
         init_response = json_rpc_request(
             proc,
             {
@@ -394,41 +483,56 @@ def validate_registration(registration: Registration, timeout_seconds: float) ->
             timeout_seconds,
         )
         if "error" in init_response:
-            return False, f"initialize 错误：{init_response['error']}"
+            return False, rpc_error_summary(stage, init_response["error"])
 
+        stage = "tools/list"
         tools_response = json_rpc_request(
             proc,
             {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
             timeout_seconds,
         )
         if "error" in tools_response:
-            return False, f"tools/list 错误：{tools_response['error']}"
+            return False, rpc_error_summary(stage, tools_response["error"])
         tools = tools_response.get("result", {}).get("tools", [])
         return True, f"{len(tools)} 个工具"
     except Exception as exc:
-        stderr = ""
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-        if proc.stderr is not None:
-            try:
-                stderr = proc.stderr.read(2000)
-            except Exception:
-                stderr = ""
-        details = str(exc)
-        if stderr.strip():
-            details = f"{details}；stderr：{stderr.strip()}"
-        return False, details
+        # Exception text may embed malformed responses, args, URLs or env values.
+        if isinstance(exc, TimeoutError):
+            reason = f"请求超时（{timeout_seconds}s）"
+        elif isinstance(exc, OSError):
+            reason = f"系统调用失败（errno={exc.errno}）"
+        elif isinstance(exc, (ValueError, TypeError, AttributeError)):
+            reason = "服务响应格式无效"
+        elif proc is not None and proc.poll() is not None:
+            reason = f"服务已退出（退出码={proc.returncode}）"
+        else:
+            reason = "协议交互失败"
+        return False, f"{stage}：{reason}；服务错误正文与 stderr 不回显"
     finally:
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+        if proc is not None:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            for stream in (proc.stdin, proc.stdout):
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except OSError:
+                        # Closing buffered stdin may retry a failed flush after
+                        # the peer closed its pipe. Preserve the primary result
+                        # and still close the other stream / validate next service.
+                        pass
+
+
+def rpc_error_summary(stage: str, error: Any) -> str:
+    """Expose only a numeric protocol code, never arbitrary remote error fields."""
+    code = error.get("code") if isinstance(error, dict) else None
+    suffix = f"（错误码={code}）" if type(code) is int else ""
+    return f"{stage}：服务返回错误{suffix}；错误正文已省略"
 
 
 def parameter_summary(registration: Registration) -> str:
@@ -462,8 +566,7 @@ def main() -> int:
 
         config_text = config_path.read_text(encoding="utf-8")
         registrations = parse_registrations(config_text)
-        before = dict(registrations)
-        additions, updates = plan_registrations(candidates, registrations, project.name)
+        additions, updates, project_regs = plan_registrations(candidates, registrations, project.name)
         write_registrations(config_path, config_text, additions, updates, args.dry_run)
     except (OSError, ValueError, TypeError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
         print(f"同步 MCP 配置失败：{exc}", file=sys.stderr)
@@ -485,12 +588,6 @@ def main() -> int:
     if not additions and not updates:
         print("没有需要注册或更新的 MCP。")
 
-    by_command = {command_identity(registration.command): registration for registration in registrations.values()}
-    project_regs = [
-        by_command[command_identity(candidate.command)]
-        for candidate in candidates
-        if command_identity(candidate.command) in by_command
-    ]
     added_names = {item.name for item in additions}
     updated_names = {item.name for item in updates}
 
@@ -503,16 +600,7 @@ def main() -> int:
             marker = "更新"
         else:
             marker = "已存在"
-        original = next(
-            (
-                name
-                for name, registered in before.items()
-                if command_identity(registered.command) == command_identity(registration.command)
-            ),
-            registration.name,
-        )
-        display_name = registration.name if registration.name == original else f"{registration.name}（匹配已有注册 {original}）"
-        print(f"- {display_name}: {registration.command} [{marker}]（{parameter_summary(registration)}）")
+        print(f"- {registration.name}: {registration.command} [{marker}]（{parameter_summary(registration)}）")
 
     if args.no_validate:
         return 0

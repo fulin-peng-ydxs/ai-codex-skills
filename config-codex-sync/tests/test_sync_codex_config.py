@@ -348,6 +348,9 @@ class ManagedRetirementTest(unittest.TestCase):
 
     def test_system_dependency_adapted_for_supported_selectors_without_source_changes(self):
         provider = self.system_dependency()
+        dependent_source = self.source / 'skills/keep/SKILL.md'
+        dependent_source.write_text(dependent_source.read_text() +
+                                    '\npython3 <skills-root>/.system/skill-creator/scripts/init_skill.py\n')
         source_before = SYNC_MODULE.tree_snapshot(self.source)
         self.target = self.root / 'claude target'
         preview = self.run_sync('--dry-run')
@@ -356,16 +359,18 @@ class ManagedRetirementTest(unittest.TestCase):
         for selector in ['claude', 'all']:
             self.run_sync('--target', selector)
             dependent = self.target / 'skills/keep/SKILL.md'
-            self.assertIn('../skill-creator/SKILL.md#initialize', dependent.read_text())
-            self.assertTrue((dependent.parent / '../skill-creator/SKILL.md').is_file())
-            self.assertEqual((provider / 'scripts/init_skill.py').read_bytes(),
-                             (self.target / 'skills/skill-creator/scripts/init_skill.py').read_bytes())
-            content = (self.target / 'skills/skill-creator/SKILL.md').read_text()
-            self.assertNotIn('CODEX_HOME', content)
-            self.assertIn(str(self.target / 'skills'), content)
+            self.assertIn(str(provider / 'SKILL.md') + '#initialize', dependent.read_text())
+            self.assertFalse((self.target / 'skills/skill-creator').exists())
+            self.assertFalse((self.target / 'skills/.system').exists())
+            import shlex
+            import subprocess
+            command = dependent.read_text().splitlines()[-1]
+            result = subprocess.run(shlex.split(command), cwd=self.target, capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual('initializer', result.stdout.strip())
         self.assertEqual(source_before, SYNC_MODULE.tree_snapshot(self.source))
-        self.assertIn('skill-creator', self.state()['managed'])
-        self.assertIn('更新 0、未变化 2', self.run_sync('--dry-run'))
+        self.assertNotIn('skill-creator', self.state()['managed'])
+        self.assertIn('更新 0、未变化 1', self.run_sync('--dry-run'))
 
     def test_default_sync_is_single_target_and_unknown_selectors_fail_before_writes(self):
         """The CLI default and compatibility alias must share one destination."""
@@ -388,23 +393,20 @@ class ManagedRetirementTest(unittest.TestCase):
             self.run_sync(*options, code=1)
             self.assertFalse(self.target.exists())
 
-    def test_unaudited_and_mcp_system_dependencies_are_rejected(self):
-        self.system_dependency('another-provider')
-        self.run_sync(code=1)
-        self.assertFalse(self.target.exists())
-        provider = self.system_dependency()
-        (self.source / 'skills/keep/SKILL.md').write_text('---\nname: keep\ndescription: test\n---\n[provider](../.system/skill-creator/SKILL.md)\n')
-        (provider / 'SKILL.md').write_text('---\nname: skill-creator\ndescription: MCP operations\n---\n')
-        self.run_sync(code=1)
-        self.assertFalse(self.target.exists())
+    def test_other_system_dependencies_are_external_and_never_copied(self):
+        provider = self.system_dependency('another-provider')
+        self.run_sync()
+        self.assertIn(str(provider / 'SKILL.md'), (self.target / 'skills/keep/SKILL.md').read_text())
+        self.assertEqual({'keep'}, set(self.state()['managed']))
+        self.assertEqual({'keep'}, {p.name for p in (self.target / 'skills').iterdir()})
 
-    def test_dependency_target_conflict_preflights_all_skill_writes(self):
+    def test_external_dependency_does_not_touch_same_named_target(self):
         self.system_dependency()
         (self.target / 'skills').mkdir(parents=True)
         (self.target / 'skills/skill-creator').write_text('preserve')
-        self.run_sync('--target', 'all', code=1)
-        self.assertFalse((self.target / 'skills/keep').exists())
-        self.assertFalse((self.target / 'CLAUDE.md').exists())
+        self.run_sync('--target', 'all')
+        self.assertTrue((self.target / 'skills/keep').exists())
+        self.assertNotIn('skill-creator', self.state()['managed'])
         self.assertEqual('preserve', (self.target / 'skills/skill-creator').read_text())
 
     def test_partial_staging_resolves_system_dependency_from_origin(self):
@@ -415,13 +417,22 @@ class ManagedRetirementTest(unittest.TestCase):
         shutil.copytree(self.source / 'skills/keep', adapter / 'skills/keep')
         shutil.copy2(self.source / 'AGENTS.md', adapter / 'AGENTS.md')
         self.run_sync('--origin-root', str(self.source), '--partial', source=adapter)
-        self.assertTrue((self.target / 'skills/skill-creator/SKILL.md').is_file())
+        self.assertIn(str(self.source / 'skills/.system/skill-creator/SKILL.md'),
+                      (self.target / 'skills/keep/SKILL.md').read_text())
+        self.assertFalse((self.target / 'skills/skill-creator').exists())
         self.assertFalse((self.target / 'skills/unselected').exists())
+        self.assertFalse((self.target / 'CLAUDE.md').exists())
 
     def test_dependency_retirement_uses_existing_management_baseline(self):
+        import json
+        # A copy managed by an older version remains governed by its baseline;
+        # switching to external references alone does not authorize deletion.
         self.system_dependency()
         self.run_sync()
-        (self.source / 'skills/keep/SKILL.md').write_text('---\nname: keep\ndescription: test\n---\n')
+        old = self.skill(self.target, 'skill-creator')
+        state = self.state()
+        state['managed']['skill-creator'] = SYNC_MODULE.tree_snapshot(old)
+        (self.target / SYNC_MODULE.STATE_FILE).write_text(json.dumps(state))
         self.run_sync()
         self.assertIn('skill-creator', self.state()['managed'])
         self.run_sync('--delete')
@@ -434,12 +445,14 @@ class ManagedRetirementTest(unittest.TestCase):
         self.assertFalse((self.target / 'skills/skill-creator').exists())
         self.assertFalse((self.target / 'skills/unrelated').exists())
 
-    def test_unadapted_provider_runtime_path_fails_closed(self):
+    def test_external_provider_content_is_not_rewritten(self):
         provider = self.system_dependency()
         entry = provider / 'SKILL.md'
         entry.write_text(entry.read_text() + '\nNew command: $CODEX_HOME/new-runtime\n')
-        self.run_sync(code=1)
-        self.assertFalse(self.target.exists())
+        baseline = SYNC_MODULE.tree_snapshot(provider)
+        self.run_sync()
+        self.assertEqual(baseline, SYNC_MODULE.tree_snapshot(provider))
+        self.assertFalse((self.target / 'skills/skill-creator').exists())
 
     def test_dependency_cannot_escape_provider_or_replace_another_source(self):
         self.system_dependency()
@@ -450,8 +463,158 @@ class ManagedRetirementTest(unittest.TestCase):
         self.assertFalse(self.target.exists())
         dependent.write_text('---\nname: keep\ndescription: test\n---\n[provider](../.system/skill-creator/SKILL.md)\n')
         self.skill(self.source, 'skill-creator')
+        self.run_sync()
+        self.assertTrue((self.target / 'skills/skill-creator/SKILL.md').exists())
+        self.assertIn(str(self.source / 'skills/.system/skill-creator/SKILL.md'),
+                      (self.target / 'skills/keep/SKILL.md').read_text())
+
+    def test_partial_skills_needs_no_agents_and_preserves_target_document(self):
+        self.target.mkdir()
+        document = self.target / 'CLAUDE.md'
+        document.write_text('target customization')
+        (self.source / 'AGENTS.md').unlink()
+        for options in [('--dry-run',), ()]:
+            output = self.run_sync('--partial', *options)
+            self.assertIn('CLAUDE.md 未纳入同步', output)
+            self.assertEqual('target customization', document.read_text())
+
+    def test_explicit_skills_scope_preserves_document_and_all_scope_updates_it(self):
+        self.target.mkdir()
+        document = self.target / 'CLAUDE.md'
+        document.write_text('target customization')
+        self.run_sync('--scope', 'skills')
+        self.assertEqual('target customization', document.read_text())
+        self.run_sync('--partial', '--scope', 'all')
+        self.assertEqual('rules', document.read_text())
+
+    def test_document_scope_needs_no_skills_and_does_not_touch_inventory(self):
+        import shutil
+        self.run_sync()
+        baseline = SYNC_MODULE.tree_snapshot(self.target / 'skills')
+        inventory = (self.target / SYNC_MODULE.STATE_FILE).read_bytes()
+        shutil.rmtree(self.source / 'skills')
+        (self.source / 'AGENTS.md').write_text('updated rules')
+        self.run_sync('--scope', 'document', '--dry-run')
+        self.assertEqual('rules', (self.target / 'CLAUDE.md').read_text())
+        self.run_sync('--scope', 'document')
+        self.assertEqual('updated rules', (self.target / 'CLAUDE.md').read_text())
+        self.assertEqual(inventory, (self.target / SYNC_MODULE.STATE_FILE).read_bytes())
+        self.assertEqual(baseline, SYNC_MODULE.tree_snapshot(self.target / 'skills'))
+        self.run_sync('--scope', 'document', '--delete', code=1)
+
+    def test_ordinary_links_and_commands_use_target_absolute_paths_with_spaces(self):
+        import shlex
+        import subprocess
+        self.target = self.root / 'claude target'
+        sibling = self.skill(self.source, 'sibling')
+        (sibling / 'run.py').write_text('print("target script")\n')
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text(entry.read_text() + '\n[other](../sibling/SKILL.md#title)\n'
+                         '\npython3 <skills-root>/sibling/run.py\n')
+        self.run_sync()
+        output = (self.target / 'skills/keep/SKILL.md').read_text()
+        self.assertIn(f'](<{self.target.resolve()}/skills/sibling/SKILL.md#title>)', output)
+        result = subprocess.run(shlex.split(output.splitlines()[-1]), cwd=self.target,
+                                capture_output=True, text=True)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('target script', result.stdout.strip())
+        self.assertIn('<skills-root>', entry.read_text())
+
+    def test_missing_ordinary_dependency_blocks_before_target_writes(self):
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text(entry.read_text() + '\n[missing](../absent/SKILL.md)\n')
         self.run_sync(code=1)
         self.assertFalse(self.target.exists())
+
+    def test_system_command_without_markdown_link_is_checked(self):
+        provider = self.system_dependency()
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text('---\nname: keep\ndescription: test\n---\n'
+                         'python3 <skills-root>/.system/skill-creator/scripts/missing.py\n')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+        entry.write_text(entry.read_text().replace('missing.py', 'init_skill.py'))
+        self.run_sync()
+        self.assertIn(str(provider / 'scripts/init_skill.py'),
+                      (self.target / 'skills/keep/SKILL.md').read_text())
+
+    def test_deletion_of_referenced_dependency_fails_before_any_target_write(self):
+        import shutil
+        provider = self.skill(self.source, 'provider')
+        entry = self.source / 'skills/keep/SKILL.md'
+        original = entry.read_text()
+        entry.write_text(original + '\n[provider](../provider/SKILL.md)\n')
+        self.run_sync()
+        baseline = SYNC_MODULE.tree_snapshot(self.target)
+        shutil.rmtree(provider)
+        (self.source / 'AGENTS.md').write_text('must not be written on failure')
+        for options in [('--dry-run',), ()]:
+            self.run_sync('--delete', *options, code=1)
+            self.assertEqual(baseline, SYNC_MODULE.tree_snapshot(self.target))
+        entry.write_text(original)
+        self.run_sync('--delete')
+        self.assertFalse((self.target / 'skills/provider').exists())
+
+    def test_retained_unselected_dependency_is_valid_for_partial_sync(self):
+        import shutil
+        self.skill(self.source, 'provider')
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text(entry.read_text() + '\n[provider](../provider/SKILL.md)\n')
+        self.run_sync()
+        adapter = self.root / 'adapter'
+        shutil.copytree(self.source / 'skills/keep', adapter / 'skills/keep')
+        self.run_sync('--partial', '--delete', '--origin-root', str(self.source), source=adapter)
+        self.assertTrue((self.target / 'skills/provider/SKILL.md').is_file())
+        self.assertIn(str(self.target.resolve() / 'skills/provider/SKILL.md'),
+                      (self.target / 'skills/keep/SKILL.md').read_text())
+
+    def test_literal_markdown_and_template_examples_remain_byte_identical(self):
+        examples = (
+            '```markdown\n[usage](docs/usage.md)\n```\n'
+            '~~~text verbatim\npython3 <skills-root>/missing/example.py\n~~~\n'
+            '````document-template\n```bash\npython3 <skills-root>/missing/example.py\n```\n'
+            '[usage](docs/template.md)\n````\n'
+            'Inline: `[usage](docs/inline.md)`\n'
+            'Double: `` `[usage](docs/with-backticks.md)` ``\n'
+            'Multiline: ``[usage](docs/multiline.md)\nmore literal text``\n'
+        )
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text(entry.read_text() + '\n' + examples)
+        source_before = entry.read_bytes()
+        self.run_sync()
+        self.assertEqual(source_before, (self.target / 'skills/keep/SKILL.md').read_bytes())
+        self.assertEqual(source_before, entry.read_bytes())
+
+    def test_live_links_and_shell_commands_are_converted_beside_examples(self):
+        provider = self.system_dependency()
+        entry = self.source / 'skills/keep/SKILL.md'
+        example = '```markdown\n[example](docs/not-a-dependency.md)\n```\n'
+        entry.write_text(entry.read_text() + '\n' + example +
+                         '\n```bash\npython3 <skills-root>/.system/skill-creator/scripts/init_skill.py\n```\n')
+        self.run_sync()
+        text = (self.target / 'skills/keep/SKILL.md').read_text()
+        self.assertIn(example, text)
+        self.assertIn(str(provider.resolve() / 'SKILL.md'), text)
+        self.assertIn(str(provider.resolve() / 'scripts/init_skill.py'), text)
+        self.assertNotIn('<skills-root>', text)
+
+    def test_missing_live_shell_dependency_still_blocks_before_writes(self):
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text(entry.read_text() + '\n```bash\npython3 <skills-root>/missing/tool.py\n```\n')
+        self.run_sync(code=1)
+        self.assertFalse(self.target.exists())
+
+    def test_missing_live_leaf_link_is_not_mistaken_for_an_example(self):
+        resource = self.source / 'skills/keep/helper.md'
+        resource.write_text('# Helper\n')
+        entry = self.source / 'skills/keep/SKILL.md'
+        entry.write_text(entry.read_text() + '\n[helper](helper.md)\n')
+        self.run_sync()
+        baseline = SYNC_MODULE.tree_snapshot(self.target)
+        resource.unlink()
+        for options in [('--dry-run',), ()]:
+            self.run_sync('--delete', *options, code=1)
+            self.assertEqual(baseline, SYNC_MODULE.tree_snapshot(self.target))
 
 if __name__ == "__main__":
     unittest.main()
