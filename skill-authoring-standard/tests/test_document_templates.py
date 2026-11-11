@@ -393,7 +393,13 @@ class FixedDocumentTests(unittest.TestCase):
                 self.assertEqual([], check.validate(good.replace(original, f'- {field}：未知：缺少接口或源码依据，影响判断；补齐后再复核。', 1), source))
                 unit = find(check.parse_tree(skeleton, True), prefix)
                 self.assertIsNotNone(unit)
-                for _, label in check.declared_fields(unit.body):
+                nodes, labels = [unit], []
+                while nodes:
+                    node = nodes.pop()
+                    labels.extend(label for _, label in check.declared_fields(node.body))
+                    nodes.extend(node.children)
+                self.assertTrue(labels)
+                for label in labels:
                     missing = re.sub(r'^(?:- )?' + re.escape(label) + r'.*\n', '', good, count=1, flags=re.M)
                     self.assertTrue(good != missing, label)
                     self.assertTrue(check.validate(missing, source), label)
@@ -679,7 +685,9 @@ class FixedDocumentTests(unittest.TestCase):
             good = good.replace(original, f'- {label}：\n\n  {value}', 1)
         self.assertEqual([], check.validate(good, source))
         snippet = '### 共用筛选状态\n- 现状与依据：已比较两处。\n- 判断与边界：复用已有入口。\n- 消费方与处理：迁移两处。\n- 验证与维护：安排回归。\n\n'
-        self.assertTrue(check.validate(good.replace('## 3. 验收与交付', snippet + '## 3. 验收与交付'), source))
+        boundary = '## 4. 测试验证与业务验收'
+        self.assertIn(boundary, good)
+        self.assertTrue(check.validate(good.replace(boundary, snippet + boundary), source))
 
     def test_operation_workflow_command_rule_fragments_resolve_to_real_sections(self):
         skill = ROOT / 'operation-workflow/SKILL.md'
