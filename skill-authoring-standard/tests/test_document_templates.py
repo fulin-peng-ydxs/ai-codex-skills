@@ -740,7 +740,8 @@ class FixedDocumentTests(unittest.TestCase):
         data_row = '| ' + ' | '.join(['样例1'] * 6) + ' |'
         self.assertIn(data_row, unknown)
         unknown = unknown.replace(data_row,
-                                  '| CFG1 / demo / test | runtime.env / DEMO_URL | '
+                                  '| CFG1 / 公共发布前置：按既有部署定义核对地址 / demo / test | '
+                                  'runtime.env / DEMO_URL | '
                                   '未核实：目标地址需从部署定义取得 | 条件性修改 | '
                                   '先核配置源，不猜值 | R2准备、R4核加载，当前待验证 |', 1)
         for case, document in [('single', single), ('multiple', multiple),
@@ -758,6 +759,46 @@ class FixedDocumentTests(unittest.TestCase):
         for case, document in invalid.items():
             with self.subTest(case=case):
                 self.assertTrue(check.validate(document, source))
+
+    def test_plan_configuration_overview_exposes_task_links_and_public_prerequisites(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        task_start = good.index('### T样例1：样例1')
+        task_end = good.index('## 4. 测试验证与业务验收', task_start)
+        task = good[task_start:task_end]
+        first = task.replace('### T样例1：样例1', '### T1：配置定义', 1)
+        first = first.replace('- 实施方案：\n\n  样例1',
+                              '- 实施方案：\n\n  定义CFG1，环境差异见发布章配置总览。', 1)
+        second = task.replace('### T样例1：样例1', '### T2：配置消费', 1)
+        second = second.replace('- 实施方案：\n\n  样例1',
+                                '- 实施方案：\n\n  消费T1定义的CFG1，按任务检查点核验生效。', 1)
+        single = good[:task_start] + first + good[task_end:]
+        shared = good[:task_start] + first + second + good[task_end:]
+        row = '| ' + ' | '.join(['样例1'] * 6) + ' |'
+        cases = [
+            ('single-task', single, 'CFG1 / [T1](#t1配置定义)（定义） / demo / test'),
+            ('shared-tasks', shared,
+             'CFG1 / [T1](#t1配置定义)（定义）、[T2](#t2配置消费)（消费） / demo / test'),
+            ('public-prerequisite', good,
+             'CFG1 / 公共发布前置：按既有部署定义核对证书来源，无本次开发改动 / demo / test'),
+            ('unknown-association', good,
+             'CFG1 / 待核实：配置消费入口尚未定位，阻塞任务归属确认，需查调用链 / demo / test'),
+        ]
+        for case, document, association in cases:
+            with self.subTest(case=case):
+                start = document.index('### 配置变更总览')
+                end = document.index('### 发布操作明细', start)
+                overview = document[start:end]
+                self.assertIn(row, overview)
+                updated = overview.replace(row, '| ' + association + ' | '
+                                           + ' | '.join(['样例1'] * 5) + ' |', 1)
+                document = document[:start] + updated + document[end:]
+                self.assertEqual([], check.validate(document, source))
+        # The existing six-column layout is retained, with an explicit task label.
+        legacy_header = good.replace('配置项 / 关联任务 / 项目或服务 / 环境',
+                                     '配置项 / 项目或服务 / 环境', 1)
+        self.assertTrue(check.validate(legacy_header, source))
+        self.assertEqual([], check.validate_existing(legacy_header))
 
     def test_plan_merged_release_preserves_legacy_documents_without_migration(self):
         source = (ROOT / 'development-workflow/references/output-template.md').read_text()
