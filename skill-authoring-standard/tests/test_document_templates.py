@@ -693,7 +693,7 @@ class FixedDocumentTests(unittest.TestCase):
         source = (ROOT / 'development-workflow/references/output-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
         self.assertNotIn('### 配置与生效', good)
-        release_slot = '### 构建与发布步骤\n\n样例1'
+        release_slot = '样例1\n\n### 配置变更总览'
         self.assertIn(release_slot, good)
         shared_plan = good.replace('### T样例1：样例1', '### T1：共享开关说明', 1)
         shared_plan = shared_plan.replace('- 实施方案：\n\n  样例1',
@@ -714,18 +714,139 @@ class FixedDocumentTests(unittest.TestCase):
         ]
         for name, document, steps in cases:
             with self.subTest(case=name):
-                document = document.replace(release_slot, '### 构建与发布步骤\n\n' + steps, 1)
+                document = document.replace(release_slot, steps + '\n\n### 配置变更总览', 1)
                 self.assertEqual([], check.validate(document, source))
+
+        for title in ['发布范围与执行顺序', '配置变更总览', '发布操作明细',
+                      '失败恢复与重新放行', '交付结果与后续']:
+            with self.subTest(flattened_section=title):
+                flattened = good.replace(f'### {title}', f'**{title}**', 1)
+                self.assertTrue(check.validate(flattened, source))
+                # Local updates still accept the existing document structure.
+                self.assertEqual([], check.validate_existing(flattened))
+
+    def test_plan_configuration_overview_supports_technical_categories(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        start = good.index('#### 样例1', good.index('### 配置变更总览'))
+        end = good.index('### 发布操作明细', start)
+        unit = good[start:end]
+        first = unit.replace('#### 样例1', '#### 构建环境类', 1)
+        second = unit.replace('#### 样例1', '#### 项目运行配置类', 1)
+        single = good[:start] + first + good[end:]
+        multiple = good[:start] + first + second + good[end:]
+        absent = good[:start] + '条目情况：不适用：隔离样例没有配置变更或核对。\n\n' + good[end:]
+        unknown = single
+        data_row = '| ' + ' | '.join(['样例1'] * 6) + ' |'
+        self.assertIn(data_row, unknown)
+        unknown = unknown.replace(data_row,
+                                  '| CFG1 / demo / test | runtime.env / DEMO_URL | '
+                                  '未核实：目标地址需从部署定义取得 | 条件性修改 | '
+                                  '先核配置源，不猜值 | R2准备、R4核加载，当前待验证 |', 1)
+        for case, document in [('single', single), ('multiple', multiple),
+                               ('absent', absent), ('unknown', unknown)]:
+            with self.subTest(case=case):
+                self.assertEqual([], check.validate(document, source))
+        invalid = {
+            'duplicate-category': good[:start] + first + first + good[end:],
+            'missing-table': single.replace(data_row, '', 1),
+            'wrong-columns': single.replace('| 人工待办 |', '| 自定义列 |', 1),
+            'flattened-category': single.replace('#### 构建环境类', '**构建环境类**', 1),
+            'old-category-depth': single.replace('#### 构建环境类', '##### 构建环境类', 1),
+            'unclassified-tables': good[:start] + unit.split('\n', 1)[1] + good[end:],
+        }
+        for case, document in invalid.items():
+            with self.subTest(case=case):
+                self.assertTrue(check.validate(document, source))
 
     def test_plan_merged_release_preserves_legacy_documents_without_migration(self):
         source = (ROOT / 'development-workflow/references/output-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])
-        boundary = '### 发布核验与失败恢复'
+        boundary = '### 失败恢复与重新放行'
         self.assertIn(boundary, good)
         legacy = good.replace(boundary, '### 配置与生效\n\n'
                               '既有计划的配置说明与旧验证状态，局部更新时保留。\n\n' + boundary, 1)
         self.assertTrue(check.validate(legacy, source))
         self.assertEqual([], check.validate_existing(legacy))
+
+    def test_plan_release_details_merge_operations_in_execution_order(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        start = good.index('## 5. 发布、回退与交付')
+        release = good[start:]
+        titles = ['发布范围与执行顺序', '配置变更总览', '发布操作明细',
+                  '失败恢复与重新放行', '交付结果与后续']
+        self.assertEqual(titles, re.findall(r'^### (.+)$', release, re.M))
+        self.assertNotIn('构建与发布步骤', release)
+        details = ('#### R1：隔离样例构建\n\n先核CFG1挂载路径，再在demo目录运行：\n\n'
+                   '```bash\nnpm run build\n```\n\n'
+                   '#### R2：隔离样例停写与配置\n\n停写、排空、备份，再准备运行配置。\n\n'
+                   '#### R3：隔离样例SQL\n\n'
+                   '| 脚本 | 目标库 | 方式及状态 |\n| --- | --- | --- |\n'
+                   '| demo.sql（拟定） | test | 人工，待产出、未执行 |\n\n'
+                   '#### R4：隔离样例配置加载核验\n\n保留受影响写入限制，待真实样例验证。\n\n'
+                   '#### R5：隔离样例受控验收\n\n全部必要核验通过才解除对应停写；'
+                   '缺样例继续停写，失败按恢复节处理。\n\n')
+        detail_start = good.index('### 发布操作明细')
+        detail_end = good.index('### 失败恢复与重新放行', detail_start)
+        merged = (good[:detail_start] + '### 发布操作明细\n\n共用前提沿用范围节。\n\n'
+                  + details + good[detail_end:])
+        self.assertNotEqual(good, merged)
+        self.assertEqual([], check.validate(merged, source))
+        # New/restructured plans promote the release sections. Local updates
+        # may retain the earlier wrapper without a forced migration.
+        legacy = merged.replace('### 发布范围与执行顺序', '### 发布范围与前置条件', 1)
+        legacy = legacy.replace('### 配置变更总览',
+                                '### 构建与发布步骤\n\n#### 全局执行顺序\n\n'
+                                '保留既有发布顺序与验证状态。\n\n#### 配置变更总览', 1)
+        legacy = legacy.replace('#### 样例1', '##### 样例1', 1)
+        legacy = legacy.replace('### 发布操作明细', '#### 发布操作明细', 1)
+        legacy = legacy.replace('### 失败恢复与重新放行', '### 发布核验与失败恢复', 1)
+        self.assertTrue(check.validate(legacy, source))
+        self.assertEqual([], check.validate_existing(legacy))
+        # An obsolete wrapper is rejected even if all five new sections remain.
+        wrapped = good.replace('### 配置变更总览',
+                               '### 构建与发布步骤\n\n旧包裹层。\n\n### 配置变更总览', 1)
+        self.assertTrue(check.validate(wrapped, source))
+        for left, right in zip(titles, titles[1:]):
+            with self.subTest(reordered=(left, right)):
+                swapped = good.replace('### ' + left, '### 临时占位', 1)
+                swapped = swapped.replace('### ' + right, '### ' + left, 1)
+                swapped = swapped.replace('### 临时占位', '### ' + right, 1)
+                self.assertTrue(check.validate(swapped, source))
+
+    def test_plan_release_operations_support_repeated_level_four_sections(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        start = good.index('#### 样例1：样例1', good.index('### 发布操作明细'))
+        end = good.index('### 失败恢复与重新放行', start)
+        unit = good[start:end]
+        first = unit.replace('#### 样例1：样例1', '#### D01：构建产物', 1)
+        second = unit.replace('#### 样例1：样例1', '#### D02：受控部署与核验', 1)
+        single = good[:start] + first + good[end:]
+        multiple = good[:start] + first + second + good[end:]
+        absent = (good[:start] + '条目情况：不适用：本次仅交付说明，没有发布操作。\n\n'
+                  + good[end:])
+        unknown = single.replace('#### D01：构建产物\n\n样例1',
+                                 '#### D01：构建产物\n\n目标构建入口未核实，来源为现有流水线；'
+                                 '保持待执行，阻塞本步及依赖部署。', 1)
+        for case, document in [('single', single), ('multiple', multiple),
+                               ('absent', absent), ('unknown', unknown)]:
+            with self.subTest(case=case):
+                self.assertEqual([], check.validate(document, source))
+        invalid = {
+            'duplicate-operation': good[:start] + first + first + good[end:],
+            'empty-operation': single.replace('#### D01：构建产物\n\n样例1',
+                                              '#### D01：构建产物', 1),
+            'wrong-depth': single.replace('#### D01：构建产物', '##### D01：构建产物', 1),
+            'flattened-operation': single.replace('#### D01：构建产物', '**D01：构建产物**', 1),
+            'no-absence-reason': good[:start] + good[end:],
+        }
+        for case, document in invalid.items():
+            with self.subTest(case=case):
+                self.assertTrue(check.validate(document, source))
+        # Existing body-only plans remain eligible for local updates.
+        self.assertEqual([], check.validate_existing(invalid['flattened-operation']))
 
     def test_operation_workflow_command_rule_fragments_resolve_to_real_sections(self):
         skill = ROOT / 'operation-workflow/SKILL.md'
