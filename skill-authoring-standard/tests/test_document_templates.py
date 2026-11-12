@@ -689,6 +689,44 @@ class FixedDocumentTests(unittest.TestCase):
         self.assertIn(boundary, good)
         self.assertTrue(check.validate(good.replace(boundary, snippet + boundary), source))
 
+    def test_plan_release_steps_accept_inline_shared_and_absent_configuration(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        self.assertNotIn('### 配置与生效', good)
+        release_slot = '### 构建与发布步骤\n\n样例1'
+        self.assertIn(release_slot, good)
+        shared_plan = good.replace('### T样例1：样例1', '### T1：共享开关说明', 1)
+        shared_plan = shared_plan.replace('- 实施方案：\n\n  样例1',
+                                          '- 实施方案：\n\n  隔离格式样例的共享配置 CFG1：demo-api 与 demo-worker '
+                                          '均读取各自 settings.env 的 ENABLE_BATCH；0 关闭、1 启用，'
+                                          '仅用于 test 环境，通过重载生效，以状态接口的 enabled 值核验。', 1)
+        cases = [
+            ('inline', good, '1. 核对隔离样例 demo-api 的待部署产物与 test 环境。\n'
+             '2. 为启用批量入口，将 demo-api/settings.env 的 ENABLE_BATCH 从 0 改为 1；'
+             '重载后检查状态接口 enabled=true，失败则恢复原值并重载，停止后续发布。\n'
+             '3. 执行业务验收，通过后交接；以上为待执行的格式样例。'),
+            ('shared', shared_plan, '1. 在 test 环境部署两个服务，保持入口关闭。\n'
+             '2. 按 [CFG1](#t1共享开关说明) 启用 demo-api 并重载，确认 enabled=true 后继续。\n'
+             '3. 引用同一说明启用 demo-worker 并重载；任一服务核验失败均按 CFG1 关闭入口、'
+             '重载并停止交付。尚未执行。'),
+            ('absent', good, '仅交付隔离样例源码，无构建、部署、SQL 或配置操作；'
+             '本地验证通过后向请求者提供源码及证据，当前待验证。'),
+        ]
+        for name, document, steps in cases:
+            with self.subTest(case=name):
+                document = document.replace(release_slot, '### 构建与发布步骤\n\n' + steps, 1)
+                self.assertEqual([], check.validate(document, source))
+
+    def test_plan_merged_release_preserves_legacy_documents_without_migration(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        boundary = '### 发布核验与失败恢复'
+        self.assertIn(boundary, good)
+        legacy = good.replace(boundary, '### 配置与生效\n\n'
+                              '既有计划的配置说明与旧验证状态，局部更新时保留。\n\n' + boundary, 1)
+        self.assertTrue(check.validate(legacy, source))
+        self.assertEqual([], check.validate_existing(legacy))
+
     def test_operation_workflow_command_rule_fragments_resolve_to_real_sections(self):
         skill = ROOT / 'operation-workflow/SKILL.md'
         references = re.findall(r'\]\((references/command-policy\.md)#([^)]*)\)', skill.read_text())
