@@ -77,7 +77,7 @@
 | [frontend-ux-audit](frontend-ux-audit/SKILL.md) | 审核可观察的页面体验。 |
 | [design-spec-authoring](design-spec-authoring/SKILL.md) | 归纳已有项目规范或初始化新项目规范。 |
 
-“优化页面”按目标选择：改善呈现用设计，找体验问题用 UX，核对设计契约用合规，治理重复实现用复用。混合任务只组合实际需要的技能；验证及联合审核复用 [前端验证规范](frontend-ux-audit/references/frontend-verification.md)。
+“优化页面”按目标选择：改善呈现用设计，找体验问题用 UX，核对设计契约用合规，治理重复实现用复用。混合任务只组合实际需要的技能；验证及联合审核复用 [前端验证规范](~/ai-agent-config/config/force/frontend/frontend-verification.md)。
 
 ### 自动化与工具集成
 
@@ -98,13 +98,13 @@
 
 1. 直接描述目标，按上方技能清单选择适用入口；需要指定技能时使用 `$技能名称`。实际触发条件及显式调用要求由对应技能维护。
 2. 执行前读取目标目录的 `SKILL.md`，按当前分支加载必要资源；不把 README 的能力摘要作为完整执行契约。
-3. 需求协作按当前阶段选闭环、正式需求、原型或开发计划，阶段衔接见 [共用契约](requirement-doc-authoring/references/workflow-contract.md)。已有成果按其角色继承，不因进入一个阶段自动补齐全链路。
+3. 需求协作按当前阶段选闭环、正式需求、原型或开发计划，阶段衔接见 [共用契约](~/ai-agent-config/config/force/requirement/requirement-collaboration.md)。已有成果按其角色继承，不因进入一个阶段自动补齐全链路。
 4. 页面任务按 [前端设计与体验治理](#前端设计与体验治理) 选择所需技能；业务闭环核查、技术解释和项目接手评估分别从对应技能进入。
 
 ## 文档输出规则入口
 
 - [文档编写规范](~/ai-agent-config/config/force/document-output.md)：内容组织、引用、保存和读者验收。
-- [需求协作共用契约](requirement-doc-authoring/references/workflow-contract.md)：需求、原型、计划的成果继承与交接。
+- [需求协作共用契约](~/ai-agent-config/config/force/requirement/requirement-collaboration.md)：需求、原型、计划的成果继承与交接。
 - [固定模板设计与校验](skill-authoring-standard/references/template-validation.md)：模板语法与检查；具体产物从上方所属技能进入其唯一模板。
 
 `.system/` 下的系统技能按各自入口维护契约：[skill-creator](.system/skill-creator/SKILL.md) 创建和更新技能，[review-agent](.system/review-agent/SKILL.md) 执行受委派的只读代码审查，[openai-docs](.system/openai-docs/SKILL.md) 提供 OpenAI 产品、API 与 Codex 文档指引，[imagegen](.system/imagegen/SKILL.md) 生成或编辑图像，[skill-installer](.system/skill-installer/SKILL.md) 安装技能。本 README 不另行定义这些技能的产物结构。

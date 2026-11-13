@@ -689,6 +689,83 @@ class FixedDocumentTests(unittest.TestCase):
         self.assertIn(boundary, good)
         self.assertTrue(check.validate(good.replace(boundary, snippet + boundary), source))
 
+    def test_plan_verification_sections_accept_reproducible_steps_and_separate_results(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        start = good.index('#### 可执行门禁（技术验证）')
+        end = good.index('## 5. 发布、回退与交付', start)
+        # Fictional fixture: tests the document contract, not a live approval system.
+        verification = '''#### 可执行门禁（技术验证）
+
+G1：隔离样例工作目录为 /workspace/demo；运行环境由项目测试脚本准备。
+
+```bash
+./scripts/test-approval --case owner-and-reviewer
+```
+
+断言：申请人不能审批；审批人操作后状态为APPROVED；同一记录重复审批仅产生一条审批记录。
+
+| 检查点 / 关联差异 | 执行入口、命令与用例范围 | 预期结果与通过条件 | AI验证结果 / 证据 / 后续处理 |
+| --- | --- | --- | --- |
+| G1 / T1 | 本节G1命令及断言 | 本节三项断言均满足 | 待验证：格式试填，不作为实际运行证据 |
+
+#### 业务验证点（真实系统交互）
+
+B1：以下路径、角色及状态是隔离格式样例的既定输入。测试环境入口为 https://approval.example.test，
+目标版本为fixture-v2；账号从测试账号页领取申请人A与审批人B，无需在文档记录密码。
+“待审批”表示已提交但尚未由审批人处理。使用唯一标题“验证-本次时间”，保存生成的记录号。
+
+1. A登录后进入“申请管理 → 我的申请”，点击“新建”，标题填写上述唯一值，金额填写100，点击“提交”。
+   预期显示“提交成功”，详情状态为“待审批”，金额为100；记录详情页记录号。
+2. 退出A，以B登录，进入“审批中心 → 待办”，按记录号搜索，打开该申请，核对金额100，点击“通过”。
+   预期显示“审批成功”，记录从待办列表消失。
+3. 退出B，以A登录，从“我的申请”按记录号打开详情并刷新。
+   预期状态为“已通过”，金额100，审批历史只有一条且审批人为B。
+
+B2：另建一条不同标题的待审批申请，以A打开详情。
+预期不存在“通过”操作；服务端拒绝与重复操作断言见G1。
+复现后从测试数据页按两个记录号清理，确认再次搜索无结果，不删除其他记录。
+
+| 检查点 / 关联差异 | 角色、操作路径与输入 | 逐步预期与最终业务结果 | AI验证结果 / 证据 / 后续处理 |
+| --- | --- | --- | --- |
+| B1 / T1 | 本节B1的三步跨角色操作 | 各步观察及最终状态、金额与历史见B1 | 待验证：等待fixture-v2测试环境，阻塞T1完成 |
+| B2 / T1 | 本节B2的申请人检查 | 无审批操作，技术拒绝判据关联G1 | 待验证：与B1使用同一环境，无人工签收前置 |
+
+'''
+        document = good[:start] + verification + good[end:]
+        self.assertEqual([], check.validate(document, source))
+        business_start = document.index('#### 业务验证点（真实系统交互）')
+        release_start = document.index('## 5. 发布、回退与交付')
+        self.assertTrue(check.validate(document[:business_start] + document[release_start:], source))
+        self.assertTrue(check.validate(document.replace(
+            '| 逐步预期与最终业务结果 |', '| 技术日志 |'), source))
+        self.assertTrue(check.validate(document.replace(
+            '| AI验证结果 / 证据 / 后续处理 |', '| 人工签收 |'), source))
+
+    def test_plan_verification_supports_simple_absent_and_legacy_cases(self):
+        source = (ROOT / 'development-workflow/references/output-template.md').read_text()
+        good = filled(check.template_blocks(source)['document'])
+        technical = good.index('#### 可执行门禁（技术验证）')
+        business = good.index('#### 业务验证点（真实系统交互）')
+        end = good.index('## 5. 发布、回退与交付', business)
+        row = '| ' + ' | '.join(['样例1'] * 4) + ' |'
+        technical_section = good[technical:business].replace(row,
+            '| G1 / T1 | 在/workspace/demo运行 ./scripts/test-filter | 空输入保留全部记录，单条件只返回匹配项 | 待验证：格式样例 |')
+        business_section = good[business:end].replace(row,
+            '| B1 / T1 | 测试角色登录样例列表，输入记录号D1并点查询，再清空并查询 | 首次仅D1；清空后恢复初始记录集合 | 待验证：格式样例，尚未连接系统 |')
+        simple = good[:technical] + technical_section + business_section + good[end:]
+        self.assertEqual([], check.validate(simple, source))
+        absent = good[:business] + good[business:end].replace(row,
+            '条目情况：不适用：仅调整内部纯函数结构，无系统入口或业务行为变化，契约回归见G1。') + good[end:]
+        self.assertEqual([], check.validate(absent, source))
+        self.assertTrue(check.validate(absent.replace(
+            '条目情况：不适用：仅调整内部纯函数结构，无系统入口或业务行为变化，契约回归见G1。', ''), source))
+        legacy = good.replace('- 任务状态：', '- 状态与验收：').replace(
+            '#### 可执行门禁（技术验证）', '#### 技术验证').replace(
+            '#### 业务验证点（真实系统交互）', '#### 业务流程验收')
+        self.assertEqual([], check.validate_existing(legacy))
+        self.assertTrue(check.validate(legacy, source))
+
     def test_plan_release_steps_accept_inline_shared_and_absent_configuration(self):
         source = (ROOT / 'development-workflow/references/output-template.md').read_text()
         good = filled(check.template_blocks(source)['document'])

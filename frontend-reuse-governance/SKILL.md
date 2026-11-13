@@ -7,7 +7,7 @@ description: 在前端开发、修改和代码审核中判断组件、状态逻�
 
 ## 职责与边界
 
-参考：[编码与复用规范](~/ai-agent-config/config/force/coding-standards.md#复用规范) · [文档编写规范](~/ai-agent-config/config/force/document-output.md)。
+参考：[编码与复用规范](~/ai-agent-config/config/force/coding-standards.md#复用规范) · [文档编写规范](~/ai-agent-config/config/force/document-output.md) · [测试规范](~/ai-agent-config/config/force/testing-standards.md)。
 
 前端开发默认复用优先。任何页面、组件、交互、状态、样式或数据处理模式第二次出现时，都必须先判断是否抽取或消费复用单元。
 
@@ -41,8 +41,7 @@ description: 在前端开发、修改和代码审核中判断组件、状态逻�
    - 保持原有行为不变，先让旧使用点和新使用点都消费同一复用单元；迁移后删除被替代的重复代码和页面私有样式。
    - 抽象只承载共同变化点，保持 API 小而清楚；差异通过明确 props、slots、options、callbacks、schema 或配置传入。
 5. 验证闭环：
-   - 行为变化按风险补充或更新定向测试，执行项目要求的适用验证命令；不因抽取复用默认执行全量测试或构建。
-   - 需要验证消费者行为或外观时，读取 [前端验证规范](../frontend-ux-audit/references/frontend-verification.md)，按影响选择证据；本技能判断共享实现是否造成分叉。
+   - 需要验证消费者行为或外观时，读取 [前端验证规范](~/ai-agent-config/config/force/frontend/frontend-verification.md)，按影响选择证据；本技能判断共享实现是否造成分叉。
    - 如果项目有组件清单、DESIGN 文档、页面模板或组件预览要求，按项目规则同步登记。
 
 ## 核心约束

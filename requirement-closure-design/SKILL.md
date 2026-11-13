@@ -13,7 +13,7 @@ description: 基于粗需求或未闭环想法补全角色、入口、操作、�
 
 输入为用户的粗需求、当前闭环成果及相关项目依据；先定位目标项目、当前讨论对象和已有确认状态。缺失事实先调研，影响闭环成立的业务选择按共用契约处理。
 
-执行前读取 [需求协作共用契约](../requirement-doc-authoring/references/workflow-contract.md)，应用调研、继承、确认和阶段交接要求及其通用规范入口；无需读取正式需求技能全文。
+执行前读取 [需求协作共用契约](~/ai-agent-config/config/force/requirement/requirement-collaboration.md)，应用调研、继承、确认和阶段交接要求及其通用规范入口；无需读取正式需求技能全文。
 
 ## 执行流程
 

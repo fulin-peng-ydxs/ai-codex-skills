@@ -9,7 +9,7 @@ description: 审核页面可观察的视觉、交互、状态反馈、控件必�
 
 参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md)。
 
-审查可观察的页面体验与视觉交付质量。参考：[交互设计清单](../frontend-design/references/interaction-design-checklist.md) · [体验实测清单](references/audit-checklist.md) · [前端验证规范](references/frontend-verification.md)。按受影响能力选择判断与实测项，项目设计规则沿用原事实源。
+审查可观察的页面体验与视觉交付质量。参考：[交互设计清单](~/ai-agent-config/config/force/frontend/interaction-design.md) · [体验实测清单](references/audit-checklist.md) · [前端验证规范](~/ai-agent-config/config/force/frontend/frontend-verification.md)。按受影响能力选择判断与实测项，项目设计规则沿用原事实源。
 
 - 项目没有移动端目标时，不要求移动端支持。
 - 不判断业务算法、数据口径、领域规则、权限策略或后端正确性；只记录其可观察的体验影响，领域原因转交业务审核。

@@ -192,7 +192,7 @@
 - 浏览器关键视口、截图、交互验证。
 - 组件预览、storybook、可视回归或项目指定验证。
 
-证据判定统一读取 [前端验证规范](../../frontend-ux-audit/references/frontend-verification.md)。本技能将有效证据映射到既有契约，不以重复追加规范代替实现修复。必改违规未解决不能判通过。
+证据判定统一读取 [前端验证规范](~/ai-agent-config/config/force/frontend/frontend-verification.md)。本技能将有效证据映射到既有契约，不以重复追加规范代替实现修复。必改违规未解决不能判通过。
 
 未运行时：
 
@@ -201,7 +201,7 @@
 
 ### 任务与能力契约映射
 
-按 [交互设计清单](../../frontend-design/references/interaction-design-checklist.md) 选择受影响能力，将项目有效规则对应到共享实现/消费点、适用状态、可观察判据和验证证据。触摸、原生输入及安装/缓存仅在项目使用且本次受影响时检查。
+按 [交互设计清单](~/ai-agent-config/config/force/frontend/interaction-design.md) 选择受影响能力，将项目有效规则对应到共享实现/消费点、适用状态、可观察判据和验证证据。触摸、原生输入及安装/缓存仅在项目使用且本次受影响时检查。
 
 逐项区分契约成立、源码遵循与实测结果；项目未规定的内容只能识别契约缺口或转交 UX 判断，不能把通用清单中的建议直接判为项目违规。
 
