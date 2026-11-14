@@ -19,11 +19,46 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import hook_command as hook
 
 
+def temporary_project(repository):
+    """Keep isolated fixtures in an existing local directory or system temp."""
+    local = repository / ".local"
+    parent = (local / "tmp/ai-agent" if local.is_dir()
+              else Path(tempfile.gettempdir()) / "ai-agent/codex-skills")
+    parent.mkdir(parents=True, exist_ok=True)
+    return tempfile.TemporaryDirectory(prefix="hook-verification-", dir=parent)
+
+
+class TemporaryProjectTests(unittest.TestCase):
+    def test_location_and_cleanup_on_failure_preserve_unrelated_files(self):
+        with temporary_project(ROOT.parent) as workspace:
+            root = Path(workspace)
+            for has_local in (False, True):
+                with self.subTest(has_local=has_local):
+                    repository = root / str(has_local)
+                    repository.mkdir()
+                    local = repository / ".local"
+                    if has_local:
+                        local.mkdir()
+                    sentinel = repository / "keep.txt"
+                    sentinel.write_text("user content")
+                    system_temp = root / "system-temp"
+                    expected = (local / "tmp/ai-agent" if has_local
+                                else system_temp / "ai-agent/codex-skills")
+                    with patch.object(tempfile, "gettempdir", return_value=str(system_temp)):
+                        with self.assertRaisesRegex(RuntimeError, "fixture failure"):
+                            with temporary_project(repository) as directory:
+                                fixture = Path(directory)
+                                self.assertEqual(expected.resolve(), fixture.parent.resolve())
+                                (fixture / "data.txt").write_text("test data")
+                                raise RuntimeError("fixture failure")
+                    self.assertFalse(fixture.exists())
+                    self.assertEqual(has_local, local.exists())
+                    self.assertEqual("user content", sentinel.read_text())
+
+
 class HookTests(unittest.TestCase):
     def setUp(self):
-        temporary_root = ROOT.parent/".local/tmp/ai-agent/hook-verification"
-        temporary_root.mkdir(parents=True, exist_ok=True)
-        self.tmp = tempfile.TemporaryDirectory(prefix="hook-fixture-", dir=temporary_root)
+        self.tmp = temporary_project(ROOT.parent)
         self.addCleanup(self.tmp.cleanup)
         self.project = Path(self.tmp.name)
         self.ops = self.project / "agent-works/operations"

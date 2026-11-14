@@ -1,7 +1,5 @@
 # 页面体验审核固定模板
 
-执行与保存见 [技能入口](../SKILL.md)；模板语法与检查命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。填写后按本文内容验收核对。
-
 ## 完整模板
 
 ````document-template

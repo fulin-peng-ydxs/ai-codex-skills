@@ -192,7 +192,7 @@
 - 浏览器关键视口、截图、交互验证。
 - 组件预览、storybook、可视回归或项目指定验证。
 
-证据判定统一读取 [前端验证规范](~/ai-agent-config/config/force/frontend/frontend-verification.md)。本技能将有效证据映射到既有契约，不以重复追加规范代替实现修复。必改违规未解决不能判通过。
+证据判定按 [前端验证规范](~/ai-agent-config/config/force/frontend/frontend-verification.md) 执行。本技能将有效证据映射到既有契约，不以重复追加规范代替实现修复。必改违规未解决不能判通过。
 
 未运行时：
 

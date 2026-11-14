@@ -1,7 +1,5 @@
 # 运维文档固定模板
 
-执行与保存见 [技能入口](../SKILL.md)；模板语法与检查命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。按实际产物块填写并核对内容验收。
-
 ## access 产物
 
 ````document-template access
