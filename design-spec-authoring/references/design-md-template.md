@@ -1,5 +1,7 @@
 # DESIGN.md 固定模板
 
+模板语法与检查命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。
+
 ## 完整模板
 
 无独立 token 文件时在下方固定基础表维护已确认初始值；已有机器事实源时只引用角色和真实入口，不复制第二份数值。按项目实际语法使用 token，不转换其 schema。未知值在原位置记录缺口，不使用示例色值、字体或尺寸代替。规划与已实现状态分开，提案不自动生效。

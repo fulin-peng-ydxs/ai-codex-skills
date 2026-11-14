@@ -1,5 +1,7 @@
 # 磁盘使用分析报告固定模板
 
+模板语法与检查命令见 [共用模板检查用法](../../skill-authoring-standard/references/template-validation.md)。
+
 ## 完整模板
 
 ````document-template
