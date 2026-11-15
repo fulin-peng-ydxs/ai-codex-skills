@@ -7,7 +7,7 @@ description: 审核 DESIGN 等设计契约的有效性及前端实现遵循情�
 
 ## 职责与边界
 
-参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md)。
+参考：[文档编写规范](~/ai-agent-config/config/force/document-output.md) · [测试与门禁维护](~/ai-agent-config/config/force/testing-standards.md#验证选择与门禁维护)。
 
 将项目 DESIGN 文档及其约束的前端实现都作为审查对象：先确认文档自身完整、一致、可执行、可验证且符合项目事实，再检查实现是否完整遵循。目标不是提出新的设计偏好，而是找出“DESIGN 契约本身不成立”以及“实现和既有 DESIGN 规范不一致”的地方。
 
