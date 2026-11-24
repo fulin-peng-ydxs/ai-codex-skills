@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -228,7 +229,7 @@ class FinishTests(unittest.TestCase):
         real_git = finisher.git
 
         def race(repo, *arguments, **kwargs):
-            if arguments[:3] == ("update-ref", "-d", f"refs/heads/{self.work}"):
+            if arguments[-4:] == ("branch", "-d", "--", self.work):
                 real_git(repo, "update-ref", f"refs/heads/{self.work}", new_source)
             return real_git(repo, *arguments, **kwargs)
 
@@ -236,6 +237,201 @@ class FinishTests(unittest.TestCase):
             with self.assertRaises(finisher.FinishError):
                 self.finish()
         self.assertEqual(self.git("rev-parse", self.work), new_source)
+
+    def write_reference_hook(self, body):
+        script = self.repo / ".git" / "test-reference-hook.py"
+        script.write_text(body)
+        hook = self.repo / ".git" / "hooks" / "reference-transaction"
+        hook.write_text(
+            f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -B {shlex.quote(str(script))} "$@"\n'
+        )
+        hook.chmod(0o700)
+
+    def test_checkout_race_before_native_deletion_preserves_peer(self):
+        self.fixture()
+        real_git = finisher.git
+        with tempfile.TemporaryDirectory(prefix="pr-peer-race-", dir=self.parent) as peer:
+            injected = False
+
+            def race(repo, *arguments, **kwargs):
+                nonlocal injected
+                if arguments[-4:] == ("branch", "-d", "--", self.work) and not injected:
+                    injected = True
+                    real_git(self.repo, "worktree", "add", peer, self.work)
+                    (Path(peer) / "app").write_text("new uncommitted work\n")
+                return real_git(repo, *arguments, **kwargs)
+
+            with patch.object(finisher, "git", side_effect=race):
+                with self.assertRaises(finisher.FinishError):
+                    self.finish()
+            self.assertEqual(real_git(peer, "rev-parse", "HEAD").stdout.strip(), self.source)
+            self.assertEqual(self.git("rev-parse", self.work), self.source)
+            self.assertEqual((Path(peer) / "app").read_text(), "new uncommitted work\n")
+
+    def test_prepared_hook_rechecks_new_worktree_occupancy(self):
+        self.fixture()
+        with tempfile.TemporaryDirectory(prefix="pr-peer-hook-", dir=self.parent) as peer:
+            self.git("worktree", "add", "--detach", peer, self.source)
+            self.write_reference_hook(
+                "import os, subprocess, sys\n"
+                "payload = sys.stdin.read()\n"
+                f"if sys.argv[1] == 'prepared' and ' refs/heads/{self.work}\\n' in payload:\n"
+                "    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}\n"
+                f"    subprocess.run(['git', '-C', {peer!r}, '-c', 'core.hooksPath=/dev/null', "
+                f"'symbolic-ref', 'HEAD', 'refs/heads/{self.work}'], env=env, check=True)\n"
+            )
+            with self.assertRaises(finisher.FinishError):
+                self.finish()
+            self.assertEqual(self.git("rev-parse", self.work), self.source)
+            self.assertEqual(
+                finisher.git(peer, "branch", "--show-current").stdout.strip(), self.work
+            )
+            self.assertEqual(finisher.git(peer, "rev-parse", "HEAD").stdout.strip(), self.source)
+
+    def test_source_change_to_an_already_merged_commit_is_rejected(self):
+        self.fixture()
+        real_git = finisher.git
+
+        def race(repo, *arguments, **kwargs):
+            if arguments[-4:] == ("branch", "-d", "--", self.work):
+                real_git(repo, "update-ref", f"refs/heads/{self.work}", self.original_sha)
+            return real_git(repo, *arguments, **kwargs)
+
+        with patch.object(finisher, "git", side_effect=race):
+            with self.assertRaises(finisher.FinishError):
+                self.finish()
+        self.assertEqual(self.git("rev-parse", self.work), self.original_sha)
+
+    def test_recreated_branch_after_delete_before_checkpoint_is_preserved(self):
+        self.fixture()
+        self.interrupt_checkpoint("complete")
+        self.git("branch", self.work, self.source)
+        self.git("config", f"branch.{self.work}.description", "new task")
+        with self.assertRaisesRegex(finisher.FinishError, "recreated"):
+            self.finish()
+        self.assertEqual(self.git("rev-parse", self.work), self.source)
+        self.assertEqual(self.git("config", "--get", f"branch.{self.work}.description"), "new task")
+
+    def test_missing_receipt_after_delete_does_not_allow_recreated_branch_deletion(self):
+        self.fixture()
+        self.interrupt_checkpoint("complete")
+        state = json.loads(self.path.read_text())
+        (self.path.parent / f"deleted-{state['delete_token']}.json").unlink()
+        self.git("branch", self.work, self.source)
+        with self.assertRaisesRegex(finisher.FinishError, "ambiguous"):
+            self.finish()
+        self.assertEqual(self.git("rev-parse", self.work), self.source)
+
+    def test_missing_receipt_with_absent_branch_can_finish(self):
+        self.fixture()
+        self.interrupt_checkpoint("complete")
+        state = json.loads(self.path.read_text())
+        (self.path.parent / f"deleted-{state['delete_token']}.json").unlink()
+        self.finish()
+        self.assert_complete(self.merged)
+
+    def test_delete_attempt_survives_sync_and_preserves_recreated_branch(self):
+        self.fixture()
+        self.interrupt_checkpoint("complete")
+        state = json.loads(self.path.read_text())
+        (self.path.parent / f"deleted-{state['delete_token']}.json").unlink()
+        tree = self.git("rev-parse", f"{self.merged}^{{tree}}")
+        newer = self.git("commit-tree", tree, "-p", self.merged, "-m", "upstream advanced")
+        self.git("update-ref", "refs/remotes/origin/main", newer)
+        real_git = finisher.git
+
+        def recreate_during_sync(repo, *arguments, **kwargs):
+            result = real_git(repo, *arguments, **kwargs)
+            if arguments == ("merge", "--ff-only", newer):
+                real_git(repo, "branch", self.work, self.source)
+                real_git(repo, "config", f"branch.{self.work}.description", "new task")
+            return result
+
+        with patch.object(finisher, "git", side_effect=recreate_during_sync):
+            with self.assertRaisesRegex(finisher.FinishError, "ambiguous"):
+                self.finish()
+        self.assertEqual(self.git("rev-parse", self.work), self.source)
+        self.assertEqual(self.git("config", "--get", f"branch.{self.work}.description"), "new task")
+        self.assertEqual(self.git("rev-parse", self.original), newer)
+        self.assertTrue(json.loads(self.path.read_text())["delete_dispatched"])
+
+    def interrupted_feature_sync_intent(self):
+        self.fixture("feature")
+        tree = self.git("rev-parse", f"{self.original_sha}^{{tree}}")
+        stale = self.git("commit-tree", tree, "-p", self.original_sha, "-m", "old upstream")
+        self.git("update-ref", "refs/remotes/origin/feature", stale)
+        save = finisher.save_state
+
+        def crash_after_intent(path, state):
+            save(path, state)
+            if state["phase"] == "syncing":
+                raise OSError("interrupted before sync Git operation")
+
+        with patch.object(finisher, "save_state", side_effect=crash_after_intent):
+            with self.assertRaises(OSError):
+                self.finish()
+        return stale
+
+    def test_diverged_upstream_on_resume_does_not_move_return_branch(self):
+        self.interrupted_feature_sync_intent()
+        tree = self.git("rev-parse", f"{self.base}^{{tree}}")
+        divergent = self.git("commit-tree", tree, "-p", self.base, "-m", "divergent upstream")
+        self.git("update-ref", "refs/remotes/origin/feature", divergent)
+        journal = self.path.read_bytes()
+        with self.assertRaisesRegex(finisher.FinishError, "diverged"):
+            self.finish()
+        self.assertEqual(self.git("rev-parse", "feature"), self.original_sha)
+        self.assertEqual(self.git("branch", "--show-current"), self.work)
+        self.assertEqual(self.path.read_bytes(), journal)
+
+    def test_resume_replans_instead_of_using_stale_upstream(self):
+        stale = self.interrupted_feature_sync_intent()
+        self.git("update-ref", "refs/remotes/origin/feature", self.base)
+        self.assertEqual(self.finish()["sync_mode"], "ahead")
+        self.assertNotEqual(self.git("rev-parse", "feature"), stale)
+        self.assert_complete(self.original_sha)
+
+    def test_repository_reference_hook_is_preserved(self):
+        self.fixture()
+        log = self.repo / ".git" / "original-hook-events"
+        self.write_reference_hook(
+            "from pathlib import Path\nimport sys\n"
+            "payload = sys.stdin.read()\n"
+            f"if ' refs/heads/{self.work}\\n' in payload:\n"
+            f"    with Path({str(log)!r}).open('a') as f: f.write(sys.argv[1] + '\\n')\n"
+        )
+        self.finish()
+        self.assertIn("prepared", log.read_text().splitlines())
+        self.assertIn("committed", log.read_text().splitlines())
+        self.assert_complete(self.merged)
+
+    def test_repository_reference_hook_can_still_reject_deletion(self):
+        self.fixture()
+        self.write_reference_hook(
+            "import sys\npayload = sys.stdin.read()\n"
+            f"if sys.argv[1] == 'prepared' and ' refs/heads/{self.work}\\n' in payload:\n"
+            "    raise SystemExit(1)\n"
+        )
+        with self.assertRaises(finisher.FinishError):
+            self.finish()
+        self.assertEqual(self.git("rev-parse", self.work), self.source)
+
+    def test_changed_private_verification_worktree_is_not_forced_removed(self):
+        self.fixture()
+        native_delete = finisher.native_delete
+
+        def change_after_delete(repo, path, state, context):
+            native_delete(repo, path, state, context)
+            verification = finisher.verification_path(path, state["delete_token"])
+            (verification / "app").write_text("unexpected private work\n")
+
+        with patch.object(finisher, "native_delete", side_effect=change_after_delete):
+            with self.assertRaisesRegex(finisher.FinishError, "has changes"):
+                self.finish()
+        state = json.loads(self.path.read_text())
+        verification = finisher.verification_path(self.path, state["delete_token"])
+        self.assertEqual((verification / "app").read_text(), "unexpected private work\n")
+        self.assertEqual(state["phase"], "cleaning")
 
     def test_resume_can_fast_forward_new_upstream_progress(self):
         self.fixture()

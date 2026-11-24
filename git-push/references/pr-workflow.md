@@ -87,17 +87,19 @@ python3 <本技能目录>/scripts/watch_pr.py <PR_URL> --expected-head <已核�
 | 阶段 | 恢复判据 |
 | --- | --- |
 | `pending` | 原分支须等于首次保护 SHA；核验后准备同步 |
-| `syncing` | 已先保存 `sync_intent.from/to`；原分支仍在 from 则重试快进，已在 to 则认可本次同步已执行，其他 SHA 停止 |
+| `syncing` | 原分支须仍在已保存的 from/to；先核验最新 upstream，分叉则保持原分支和记录不变。仍在 from 时重算并保存当前合法目标，不能盲目重放旧 to；已在 to 时认可已执行步骤，再按最新合法计划继续 |
 | `synced` | 使用 `synced_sha` 保护原分支，不再要求它等于首次 SHA；只补未完成步骤 |
-| `cleaning` | 同步已完成，继续核验和删除；分支已不存在则认可删除已执行，补齐记录 |
+| `cleaning` | 使用 `delete_token`、`delete_dispatched` 和提交后的删除凭证识别尝试；分支已不存在可补齐收尾。已发出删除而同名分支仍存在时，按重建或身份不明保留，不自动重删 |
 | `complete` | 重复执行只核验并返回已完成；同名分支被重新创建或原分支后来变化时保留，不再次删除或覆盖 |
 
 ### 同步与清理判据
 
 1. 工作区、暂存区及未跟踪文件须干净；当前分支只能是本次返回分支或工作分支。相关分支在其他 worktree 使用、源 SHA 变化、返回分支不匹配当前阶段保护 SHA 时停止，不接纳无关变更。
-2. 返回原分支后，与自身 upstream 相等则无需移动；原分支落后时仅快进。原分支不是 PR 目标且安全领先自身 upstream 时，允许保持领先：upstream 必须是原分支祖先，全部本地领先提交须在 `allowed_commits` 中，并已进入核实的 PR 合并提交。此时不要求本地 HEAD 与 upstream 相等，不把目标 main 强行合入原分支。历史分叉或未审阅的领先提交仍停止，不 reset、rebase 或制造额外 merge commit。
-3. 删除依据是本轮源提交已进入 PR 目标，不要求它是当前返回分支的祖先。仅删除原记录中的本次工作分支，且它仍匹配核实的源 SHA、未被 worktree 使用。脚本先验证 PR 目标中的祖先关系，再使用 `git update-ref -d <工作分支完整引用> <预期源SHA>` 原子比较并删除，防止检查后引用变化被误删；这不是对未合并内容的强制删除。清理仅该分支的本地配置，不改原分支 upstream，不删除远端分支或批量清理其他分支。
-4. 同步意图在 Git 写入前保存；执行后记录 `synced_sha`。删除意图同样先保存，实际已删但结果尚未落盘时可从 `cleaning` 恢复。同步与清理失败都保留最后有效记录，不因自身已完成的操作误判为外部修改，也不把后来重新创建的同名分支纳入旧任务。
+2. 在切换或移动原分支前检查最新 upstream：相等则无需移动，落后则仅快进；恢复时也先做此检查，不能先重放旧意图再检查。原分支不是 PR 目标且安全领先自身 upstream 时，允许保持领先：upstream 必须是原分支祖先，全部本地领先提交须在 `allowed_commits` 中，并已进入核实的 PR 合并提交。此时不要求本地 HEAD 与 upstream 相等，不把目标 main 强行合入原分支。历史分叉或未审阅的领先提交仍停止，不 reset、rebase 或制造额外 merge commit。
+3. 删除依据是本轮源提交已进入 PR 目标，不要求它是当前返回分支的祖先。脚本在 Git 私有目录建立 detached 验证 worktree，其 HEAD 固定为 PR 合并提交；在该 worktree 内使用不带强制选项的 `git branch -d`，并以命令级临时配置忽略源分支原有 upstream，使 Git 按 PR 合并历史判断。原分支及工作分支的持久 upstream 不变。
+4. 删除命令保留 Git 原生 worktree 占用检查，并使用 [引用事务钩子](https://git-scm.com/docs/githooks) 在 `prepared` 阶段再次核验源 SHA 和最新 worktree 占用。已有仓库 `reference-transaction` hook 会被调用并保留其拒绝结果，不绕过仓库策略。保护钩子见 [guard_branch_delete.py](../scripts/guard_branch_delete.py)；不退回底层引用强删或使用 `-D`。
+5. 删除命令发出前持久保存 `delete_dispatched=true` 及本次 token；事务提交后写入 `deleted-<token>.json` 凭证。已删除而同名分支重建时，无论 SHA 是否相同均保留。若进程在删除与凭证落盘之间中断，且同名分支仍存在，也按结果不明保留。尝试标记不因后续同步或阶段切换而清零，删除身份在入口和清理前统一复核，不能清除标记自动重删。旧版 `cleaning` 记录缺少尝试标记时同样保守处理；需用户明确授权并重新核实当前分支归属后才另行处理，不伪造旧任务完成。
+6. 验证 worktree 的位置由 token 固定，恢复可核验后复用；正常完成时用 Git 原生 `worktree remove` 移除，不强制删除。有文件改动、非预期 HEAD、被锁定或身份不符时保留并报告。记录和删除凭证保留为恢复依据；不批量清理其他分支、worktree 或远端引用。
 
 复用本地收尾脚本，传入实际状态文件的绝对路径和仓库目录：
 
@@ -109,4 +111,4 @@ python3 <本技能目录>/scripts/finish_pr.py --repo <仓库目录> --state <Gi
 
 全部完成才报告 PR 推送闭环成功。已合并但同步或清理失败应报告“远端已合并，本地同步/清理未完成”及仍保留的分支。超时或失败时不提前切回原分支、对齐引用或删除恢复依据；后续沿同一 PR 查询与恢复，不把失败 PR 混入独立任务。
 
-维护时运行 `python3 -B -m unittest discover -s <本技能目录>/tests -p 'test_*.py'`；真实 Git 回归覆盖安全领先、同步后中断、删除后中断、重复清理及状态漂移拒绝。平台合并证据由测试夹具模拟，不将本地回归解释为真实 GitHub CI 验收。
+维护时运行 `python3 -B -m unittest discover -s <本技能目录>/tests -p 'test_*.py'`；真实 Git 回归覆盖安全领先、同步/删除后中断、重复清理、同 SHA 分支重建、缺失删除凭证、删除前及事务内新增 worktree 占用、源 SHA 变化、原仓库 hook 保留，以及 upstream 分叉时原分支和记录不变。平台合并证据由测试夹具模拟，不将本地回归解释为真实 GitHub CI 验收。

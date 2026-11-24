@@ -30,8 +30,9 @@ def query_json(arguments, timeout):
     except subprocess.TimeoutExpired as error:
         raise QueryFailure("gh_command_timeout") from error
     # FileNotFoundError is handled immediately by the watcher rather than retried.
+    checks = arguments[:2] == ["pr", "checks"]
     if (
-        arguments[:2] == ["pr", "checks"]
+        checks
         and completed.returncode == 1
         and not completed.stdout.strip()
         and completed.stderr.lower()
@@ -39,16 +40,12 @@ def query_json(arguments, timeout):
         .startswith(("no checks reported", "no required checks reported"))
     ):
         return []
-    if completed.returncode not in (0, 8) or (
-        completed.returncode == 8 and arguments[:2] != ["pr", "checks"]
+    # Pending (8) and failing (1) checks can still carry a usable JSON snapshot.
+    allowed = (0, 1, 8) if checks else (0,)
+    if completed.returncode not in allowed or (
+        completed.returncode == 1 and not completed.stdout.strip()
     ):
-        # gh checks may return 1 for failing checks, together with usable JSON.
-        if not (
-            arguments[:2] == ["pr", "checks"]
-            and completed.returncode == 1
-            and completed.stdout.strip()
-        ):
-            raise QueryFailure(f"gh_{arguments[1]}_exit_{completed.returncode}")
+        raise QueryFailure(f"gh_{arguments[1]}_exit_{completed.returncode}")
     try:
         return json.loads(completed.stdout)
     except json.JSONDecodeError as error:

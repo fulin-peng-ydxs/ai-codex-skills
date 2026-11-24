@@ -5,8 +5,11 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
+import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 
@@ -14,9 +17,15 @@ class FinishError(Exception):
     """Local evidence or a Git operation did not meet the cleanup contract."""
 
 
-def git(repo, *arguments, allow=(0,)):
+def git(repo, *arguments, allow=(0,), env=None):
     result = subprocess.run(
-        ["git", *arguments], cwd=repo, capture_output=True, text=True, timeout=30, check=False
+        ["git", *arguments],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+        env=env,
     )
     if result.returncode not in allow:
         raise FinishError(f"git {arguments[0]} failed: {result.stderr.strip()[:300]}")
@@ -30,6 +39,16 @@ def ref_sha(repo, ref):
 
 def ancestor(repo, older, newer):
     return git(repo, "merge-base", "--is-ancestor", older, newer, allow=(0, 1)).returncode == 0
+
+
+def worktrees(repo):
+    """Use the same NUL-delimited inventory for preflight and in-transaction occupancy checks."""
+    for block in git(repo, "worktree", "list", "--porcelain", "-z").stdout.split("\0\0"):
+        fields = dict(field.partition(" ")[::2] for field in block.split("\0") if field)
+        if fields:
+            if "worktree" not in fields:
+                raise FinishError("invalid Git worktree inventory")
+            yield Path(fields["worktree"]).resolve(), fields.get("branch")
 
 
 def save_state(path, state):
@@ -108,12 +127,9 @@ def check_local_state(repo, context):
     current = git(repo, "branch", "--show-current").stdout.strip()
     if current not in {context["return_branch"], context["work_branch"]}:
         raise FinishError("current branch is outside this PR workflow")
-    worktree_path = None
     protected = {f"refs/heads/{context[name]}" for name in ("return_branch", "work_branch")}
-    for line in git(repo, "worktree", "list", "--porcelain").stdout.splitlines():
-        if line.startswith("worktree "):
-            worktree_path = Path(line[9:]).resolve()
-        elif line.startswith("branch ") and line[7:] in protected and worktree_path != repo:
+    for worktree_path, branch in worktrees(repo):
+        if branch in protected and worktree_path != repo:
             raise FinishError("a workflow branch is in use by another worktree")
     work = ref_sha(repo, f"refs/heads/{context['work_branch']}")
     if work is not None and work != context["source_sha"]:
@@ -141,6 +157,109 @@ def sync_plan(repo, context, current):
     raise FinishError("return branch diverged or has unapproved ahead commits")
 
 
+def verification_path(path, token):
+    """Only task-private detached worktrees may be created or removed by finalization."""
+    return path.parent / f"verification-{token}"
+
+
+def check_verification(repo, path, context):
+    if git(path, "rev-parse", "HEAD").stdout.strip() != context["merge_sha"]:
+        raise FinishError("private verification worktree HEAD changed; preserve it")
+    if git(path, "branch", "--show-current").stdout.strip():
+        raise FinishError("private verification worktree is no longer detached; preserve it")
+    if git(path, "status", "--porcelain", "--untracked-files=normal").stdout.strip():
+        raise FinishError("private verification worktree has changes; preserve it")
+    if Path(git(path, "rev-parse", "--show-toplevel").stdout.strip()).resolve() != path:
+        raise FinishError("private verification worktree identity changed")
+    if (
+        git(path, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+        != git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+    ):
+        raise FinishError("private verification worktree belongs to another repository")
+
+
+def native_delete(repo, path, state, context):
+    """Use Git's occupancy protection and PR-merge ancestry, with an in-transaction SHA guard."""
+    token = state["delete_token"]
+    verification = verification_path(path, token)
+    if not verification.exists():
+        git(repo, "worktree", "add", "--detach", str(verification), context["merge_sha"])
+    check_verification(repo, verification, context)
+    check_local_state(repo, context)
+    hook_path = Path(
+        git(repo, "rev-parse", "--git-path", "hooks/reference-transaction").stdout.strip()
+    )
+    if not hook_path.is_absolute():
+        hook_path = repo / hook_path
+    guard = Path(__file__).resolve().with_name("guard_branch_delete.py")
+    with tempfile.TemporaryDirectory(prefix=f"guard-{token}-", dir=path.parent) as hooks:
+        wrapper = Path(hooks) / "reference-transaction"
+        wrapper.write_text(
+            f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -B {shlex.quote(str(guard))} "$@"\n'
+        )
+        wrapper.chmod(0o700)
+        env = {
+            **os.environ,
+            "CODEX_PR_DELETE_REF": f"refs/heads/{context['work_branch']}",
+            "CODEX_PR_DELETE_SHA": context["source_sha"],
+            "CODEX_PR_DELETE_TOKEN": token,
+            "CODEX_PR_DELETE_RECEIPT": str(path.parent / f"deleted-{token}.json"),
+            "CODEX_PR_ORIGINAL_REF_HOOK": str(hook_path),
+        }
+        # A nonexistent per-command upstream makes -d use this detached PR merge HEAD.
+        # No persistent branch configuration is changed and no force-delete option is used.
+        state["delete_dispatched"] = True
+        save_state(path, state)
+        git(
+            verification,
+            "-c",
+            f"core.hooksPath={hooks}",
+            "-c",
+            f"branch.{context['work_branch']}.remote=codex-unconfigured-{token}",
+            "branch",
+            "-d",
+            "--",
+            context["work_branch"],
+            env=env,
+        )
+
+
+def remove_verification(repo, path, state, context):
+    token = state.get("delete_token")
+    if token:
+        verification = verification_path(path, token)
+        if verification.exists():
+            check_verification(repo, verification, context)
+            git(repo, "worktree", "remove", str(verification))
+
+
+def check_cleanup_identity(path, state, context, work):
+    """A deletion attempt stays binding across sync retries, regardless of the current phase."""
+    token = state.get("delete_token")
+    if token is not None and (
+        not isinstance(token, str) or not re.fullmatch(r"[0-9a-f]{32}", token)
+    ):
+        raise FinishError("invalid cleanup token")
+    # Legacy cleanup records cannot prove a deletion was never dispatched.
+    if "delete_dispatched" not in state and (token or state["phase"] == "cleaning"):
+        state["delete_dispatched"] = True
+    receipt = path.parent / f"deleted-{token}.json" if token else None
+    if receipt is not None and receipt.exists():
+        expected = {
+            "token": token,
+            "ref": f"refs/heads/{context['work_branch']}",
+            "sha": context["source_sha"],
+        }
+        if json.loads(receipt.read_text()) != expected:
+            raise FinishError("deletion receipt does not match this PR workflow")
+        if work is not None:
+            raise FinishError("work branch was recreated after deletion; preserve it")
+    if work is not None and state.get("delete_dispatched", False):
+        raise FinishError(
+            "previous deletion outcome is ambiguous or branch was recreated; preserve it"
+        )
+
+
 def finish_pr(repo, path):
     """The caller verifies platform merge evidence and fetches refs before invoking this."""
     repo = Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
@@ -160,6 +279,8 @@ def finish_pr(repo, path):
     if original is None:
         raise FinishError("original return branch is missing")
 
+    check_cleanup_identity(path, state, context, work)
+
     if state["phase"] == "complete":
         if original != state.get("synced_sha") or work is not None:
             raise FinishError(
@@ -171,21 +292,13 @@ def finish_pr(repo, path):
         intent = state.get("sync_intent", {})
         if original not in {intent.get("from"), intent.get("to")}:
             raise FinishError("return branch no longer matches the saved sync intent")
-        if original == intent.get("from"):
-            # A failed or interrupted command can be retried against its pinned target.
-            if not ancestor(repo, original, intent["to"]):
-                raise FinishError("saved sync intent is not a fast-forward")
-            git(repo, "switch", context["return_branch"])
-            git(repo, "merge", "--ff-only", intent["to"])
-        state.update(phase="synced", synced_sha=intent["to"])
-        save_state(path, state)
-        original = intent["to"]
-
-    expected = context["return_sha"] if state["phase"] == "pending" else state.get("synced_sha")
-    if original != expected:
-        raise FinishError("return branch changed outside the saved workflow progress")
+    else:
+        expected = context["return_sha"] if state["phase"] == "pending" else state.get("synced_sha")
+        if original != expected:
+            raise FinishError("return branch changed outside the saved workflow progress")
+    # Initial and resumed synchronization share one validated plan and one write sequence.
     desired, mode, ahead_count = sync_plan(repo, context, original)
-    if desired != original or state["phase"] == "pending":
+    if desired != original or state["phase"] in {"pending", "syncing"}:
         state.update(phase="syncing", sync_intent={"from": original, "to": desired})
         save_state(path, state)
         git(repo, "switch", context["return_branch"])
@@ -197,27 +310,24 @@ def finish_pr(repo, path):
         git(repo, "switch", context["return_branch"])
 
     work = check_local_state(repo, context)
+    check_cleanup_identity(path, state, context, work)
     if ref_sha(repo, original_ref) != state["synced_sha"]:
         raise FinishError("return branch changed after synchronization")
     final_target, _, _ = sync_plan(repo, context, state["synced_sha"])
     if final_target != state["synced_sha"]:
         raise FinishError("return upstream advanced during finalization; retry with saved progress")
+    state.setdefault("delete_dispatched", False)
     state.update(phase="cleaning")
+    state.setdefault("delete_token", uuid.uuid4().hex)
     save_state(path, state)
     if git(repo, "branch", "--show-current").stdout.strip() != context["return_branch"]:
         raise FinishError("current branch changed before cleanup")
     if work is not None:
-        # The merged-to ref is the PR target, which need not be the checked-out branch.
-        # Compare-and-delete prevents deleting a source ref that changed after verification.
-        git(repo, "update-ref", "-d", f"refs/heads/{context['work_branch']}", context["source_sha"])
+        native_delete(repo, path, state, context)
     if ref_sha(repo, f"refs/heads/{context['work_branch']}") is not None:
         raise FinishError("work branch was recreated; preserve it")
-    section = f"branch.{context['work_branch']}"
-    config = git(
-        repo, "config", "--local", "--get-regexp", f"^{re.escape(section)}\\.", allow=(0, 1)
-    )
-    if config.returncode == 0:
-        git(repo, "config", "--local", "--remove-section", section)
+    # Native branch deletion removes its own config. Never remove a recreated branch's config.
+    remove_verification(repo, path, state, context)
     state.update(phase="complete", cleanup="deleted" if work is not None else "already_absent")
     save_state(path, state)
     return {
