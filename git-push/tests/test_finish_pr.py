@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+
 SPEC = importlib.util.spec_from_file_location(
     "finish_pr", Path(__file__).resolve().parents[1] / "scripts" / "finish_pr.py"
 )
@@ -43,7 +45,7 @@ class FinishTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, (args, result.stderr))
         return result.stdout.strip()
 
-    def fixture(self, original="main"):
+    def fixture(self, original="main", branch_first=False):
         self.git("init", "-b", "main")
         self.git("config", "user.name", "PR finalization test")
         self.git("config", "user.email", "test@example.invalid")
@@ -56,11 +58,15 @@ class FinishTests(unittest.TestCase):
         self.git("update-ref", f"refs/remotes/origin/{original}", self.base)
         if original != "main":
             self.git("switch", "-c", original)
+        self.work = "codex/task"
+        if branch_first:
+            self.git("switch", "-c", self.work)
         (self.repo / "app").write_text("B\n")
         self.git("commit", "-am", "B")
-        self.original_sha = self.git("rev-parse", "HEAD")
-        self.work = "codex/task"
-        self.git("switch", "-c", self.work)
+        first_commit = self.git("rev-parse", "HEAD")
+        self.original_sha = self.base if branch_first else first_commit
+        if not branch_first:
+            self.git("switch", "-c", self.work)
         (self.repo / "app").write_text("C repair\n")
         self.git("commit", "-am", "C")
         self.source = self.git("rev-parse", "HEAD")
@@ -87,7 +93,7 @@ class FinishTests(unittest.TestCase):
                 "source_sha": self.source,
                 "target_ref": "refs/remotes/origin/main",
                 "merge_sha": self.merged,
-                "allowed_commits": [self.original_sha, self.source],
+                "allowed_commits": [first_commit, self.source],
             },
         }
         finisher.save_state(self.path, self.state)
@@ -111,15 +117,47 @@ class FinishTests(unittest.TestCase):
                 raise OSError("simulated process interruption before checkpoint")
             save(path, state)
 
-        with patch.object(finisher, "save_state", side_effect=write):
-            with self.assertRaises(OSError):
-                self.finish()
+        with patch.object(finisher, "save_state", side_effect=write), self.assertRaises(OSError):
+            self.finish()
 
     def test_main_sync_and_cleanup(self):
         self.fixture()
         self.assertEqual(self.finish()["sync_mode"], "fast_forward")
         self.assert_complete(self.merged)
         self.assertEqual((self.repo / "app").read_text(), "C repair\n")
+
+    def test_branch_first_keeps_main_unchanged_until_verified_merge_sync(self):
+        self.fixture(branch_first=True)
+        self.assertEqual(self.git("rev-parse", "main"), self.base)
+        self.assertNotEqual(self.source, self.base)
+        self.assertEqual(self.finish()["sync_mode"], "fast_forward")
+        self.assert_complete(self.merged)
+
+    def test_watch_checkpoint_feeds_safe_cleanup_without_moving_original_early(self):
+        import watch_pr
+
+        self.fixture(branch_first=True)
+        state = json.loads(self.path.read_text())
+        state['phase'] = 'preparing'
+        state['context'].pop('merge_sha')
+        state['context'].pop('merged_at')
+        proof = {
+            'head_sha': self.source, 'base_branch': 'main', 'head_branch': self.work,
+            'merge_status': 'merged', 'merge_sha': self.merged,
+            'merged_at': '2026-11-25T10:00:00Z', 'cleanup_allowed': True,
+            'validation_status': 'passed',
+        }
+        with patch.object(watch_pr, 'inspect_pr', return_value=('merged', proof)):
+            code, result = watch_pr.watch_pr(
+                state['context']['pr_url'], self.source, 1, state=state, state_path=self.path,
+            )
+        self.assertEqual(code, 0)
+        self.assertTrue(result['acceptance_complete'])
+        self.assertEqual(self.git('rev-parse', 'main'), self.base)
+        self.assertEqual(state['context']['return_sha'], self.base)
+        self.assertEqual(state['phase'], 'pending')
+        self.finish()
+        self.assert_complete(self.merged)
 
     def test_feature_may_remain_safely_ahead_of_its_upstream(self):
         self.fixture("feature")
@@ -233,9 +271,8 @@ class FinishTests(unittest.TestCase):
                 real_git(repo, "update-ref", f"refs/heads/{self.work}", new_source)
             return real_git(repo, *arguments, **kwargs)
 
-        with patch.object(finisher, "git", side_effect=race):
-            with self.assertRaises(finisher.FinishError):
-                self.finish()
+        with patch.object(finisher, "git", side_effect=race), self.assertRaises(finisher.FinishError):
+            self.finish()
         self.assertEqual(self.git("rev-parse", self.work), new_source)
 
     def write_reference_hook(self, body):
@@ -261,9 +298,8 @@ class FinishTests(unittest.TestCase):
                     (Path(peer) / "app").write_text("new uncommitted work\n")
                 return real_git(repo, *arguments, **kwargs)
 
-            with patch.object(finisher, "git", side_effect=race):
-                with self.assertRaises(finisher.FinishError):
-                    self.finish()
+            with patch.object(finisher, "git", side_effect=race), self.assertRaises(finisher.FinishError):
+                self.finish()
             self.assertEqual(real_git(peer, "rev-parse", "HEAD").stdout.strip(), self.source)
             self.assertEqual(self.git("rev-parse", self.work), self.source)
             self.assertEqual((Path(peer) / "app").read_text(), "new uncommitted work\n")
@@ -297,9 +333,8 @@ class FinishTests(unittest.TestCase):
                 real_git(repo, "update-ref", f"refs/heads/{self.work}", self.original_sha)
             return real_git(repo, *arguments, **kwargs)
 
-        with patch.object(finisher, "git", side_effect=race):
-            with self.assertRaises(finisher.FinishError):
-                self.finish()
+        with patch.object(finisher, "git", side_effect=race), self.assertRaises(finisher.FinishError):
+            self.finish()
         self.assertEqual(self.git("rev-parse", self.work), self.original_sha)
 
     def test_recreated_branch_after_delete_before_checkpoint_is_preserved(self):
@@ -347,9 +382,8 @@ class FinishTests(unittest.TestCase):
                 real_git(repo, "config", f"branch.{self.work}.description", "new task")
             return result
 
-        with patch.object(finisher, "git", side_effect=recreate_during_sync):
-            with self.assertRaisesRegex(finisher.FinishError, "ambiguous"):
-                self.finish()
+        with patch.object(finisher, "git", side_effect=recreate_during_sync), self.assertRaisesRegex(finisher.FinishError, "ambiguous"):
+            self.finish()
         self.assertEqual(self.git("rev-parse", self.work), self.source)
         self.assertEqual(self.git("config", "--get", f"branch.{self.work}.description"), "new task")
         self.assertEqual(self.git("rev-parse", self.original), newer)
@@ -367,9 +401,8 @@ class FinishTests(unittest.TestCase):
             if state["phase"] == "syncing":
                 raise OSError("interrupted before sync Git operation")
 
-        with patch.object(finisher, "save_state", side_effect=crash_after_intent):
-            with self.assertRaises(OSError):
-                self.finish()
+        with patch.object(finisher, "save_state", side_effect=crash_after_intent), self.assertRaises(OSError):
+            self.finish()
         return stale
 
     def test_diverged_upstream_on_resume_does_not_move_return_branch(self):
@@ -425,9 +458,8 @@ class FinishTests(unittest.TestCase):
             verification = finisher.verification_path(path, state["delete_token"])
             (verification / "app").write_text("unexpected private work\n")
 
-        with patch.object(finisher, "native_delete", side_effect=change_after_delete):
-            with self.assertRaisesRegex(finisher.FinishError, "has changes"):
-                self.finish()
+        with patch.object(finisher, "native_delete", side_effect=change_after_delete), self.assertRaisesRegex(finisher.FinishError, "has changes"):
+            self.finish()
         state = json.loads(self.path.read_text())
         verification = finisher.verification_path(self.path, state["delete_token"])
         self.assertEqual((verification / "app").read_text(), "unexpected private work\n")

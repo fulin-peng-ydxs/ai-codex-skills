@@ -12,6 +12,8 @@ import tempfile
 import uuid
 from pathlib import Path
 
+from pr_state import save_state
+
 
 class FinishError(Exception):
     """Local evidence or a Git operation did not meet the cleanup contract."""
@@ -49,24 +51,6 @@ def worktrees(repo):
             if "worktree" not in fields:
                 raise FinishError("invalid Git worktree inventory")
             yield Path(fields["worktree"]).resolve(), fields.get("branch")
-
-
-def save_state(path, state):
-    """Persist intent before Git writes; atomic replacement keeps prior checkpoints usable."""
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, delete=False
-        ) as f:
-            temporary = Path(f.name)
-            json.dump(state, f, ensure_ascii=False, indent=2)
-            f.write("\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temporary, path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
 
 
 def validate_state(repo, state):
@@ -113,11 +97,11 @@ def validate_state(repo, state):
             for key in ("from", "to")
         ):
             raise FinishError("invalid saved synchronization intent")
-    if state["phase"] in {"synced", "cleaning", "complete"}:
-        if not isinstance(state.get("synced_sha"), str) or not sha_pattern.fullmatch(
-            state["synced_sha"]
-        ):
-            raise FinishError("missing completed synchronization SHA")
+    if state["phase"] in {"synced", "cleaning", "complete"} and (
+        not isinstance(state.get("synced_sha"), str)
+        or not sha_pattern.fullmatch(state["synced_sha"])
+    ):
+        raise FinishError("missing completed synchronization SHA")
     return context
 
 
