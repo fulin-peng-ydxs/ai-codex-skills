@@ -1,6 +1,7 @@
 """Local filesystem/process tests; no financial data or real research archives."""
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -171,6 +172,94 @@ p.publish(sys.argv[2],sys.argv[3],sys.argv[4])
         self.assertEqual(self.state.read_bytes(), self.old)
         self.assertEqual(list(self.company.glob('.state-write-*.tmp')), [])
         self.assertEqual(self.run_cli().returncode, 0)
+
+    def artifacts(self, mapping):
+        manifest = self.root / 'artifacts.json'
+        manifest.write_text(json.dumps({k: str(v) for k, v in mapping.items()}))
+        return manifest
+
+    def test_repeated_report_updates_keep_only_current_files(self):
+        report = self.root / 'report.md'
+        report.write_text('current research')
+        data = self.root / 'data.json'
+        data.write_text('{"current": 1}')
+        manifest = self.artifacts({'report.md': report, 'evidence/data.json': data})
+        result = self.run_cli('--artifacts', str(manifest))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        report.write_text('corrected research')
+        result = self.run_cli('--artifacts', str(manifest), expected=publisher.digest(self.new))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual((self.company / 'report.md').read_text(), 'corrected research')
+        self.assertEqual((self.company / 'evidence/data.json').read_text(), '{"current": 1}')
+        self.assertEqual({p.relative_to(self.company).as_posix()
+                          for p in self.company.rglob('*') if p.is_file()},
+                         {'.state.lock', 'state.md', 'report.md', 'evidence/data.json'})
+
+    def test_artifact_conflict_and_old_cutoff_preserve_report(self):
+        report = self.company / 'report.md'
+        report.write_text('old research')
+        staged = self.root / 'new-report.md'
+        staged.write_text('new research')
+        manifest = self.artifacts({'report.md': staged})
+        result = self.run_cli('--artifacts', str(manifest), expected='stale')
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(report.read_text(), 'old research')
+        self.candidate.write_bytes(body('2020-01-01T00:00:00Z', 'past'))
+        self.assertEqual(self.run_cli('--artifacts', str(manifest)).returncode, 5)
+        self.assertEqual(report.read_text(), 'old research')
+
+    def test_competing_report_updates_match_the_winning_state(self):
+        second = self.root / 'second-state.md'
+        second_data = body('2026-11-24T10:00:00+08:00', 'v3')
+        second.write_bytes(second_data)
+        jobs = []
+        for label, state in [('first', self.candidate), ('second', second)]:
+            report = self.root / (label + '-report.md')
+            report.write_text(label)
+            manifest = self.root / (label + '-files.json')
+            manifest.write_text(json.dumps({'report.md': str(report)}))
+            jobs.append(subprocess.Popen(self.command(state) + ['--artifacts', str(manifest)],
+                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE))
+        for proc in jobs:
+            proc.communicate(timeout=10)
+        self.assertEqual(sorted(proc.returncode for proc in jobs), [0, 3])
+        winner = 'first' if self.state.read_bytes() == self.new else 'second'
+        self.assertEqual((self.company / 'report.md').read_text(), winner)
+
+    def test_invalid_artifact_paths_reject_whole_batch(self):
+        report = self.company / 'report.md'
+        report.write_text('old research')
+        staged = self.root / 'new-report.md'
+        staged.write_text('new research')
+        (self.company / 'evidence').symlink_to(self.root, target_is_directory=True)
+        for invalid in ['../outside.md', '/outside.md', 'state.md', '.state.lock',
+                        '.git/config', 'reports/backup.md', 'evidence/escaped.md']:
+            with self.subTest(path=invalid):
+                manifest = self.artifacts({'report.md': staged, invalid: staged})
+                self.assertEqual(self.run_cli('--artifacts', str(manifest)).returncode, 1)
+                self.assertEqual(report.read_text(), 'old research')
+                self.assertEqual(self.state.read_bytes(), self.old)
+
+    def test_partial_artifact_failure_does_not_publish_state(self):
+        staged = self.root / 'new-report.md'
+        staged.write_text('new research')
+        manifest = self.artifacts({'report.md': staged, 'evidence/data.json': staged})
+        real = publisher.os.replace
+
+        def fail_data(source, destination):
+            if Path(destination).name == 'data.json':
+                raise OSError('injected second-file failure')
+            return real(source, destination)
+
+        with mock.patch.object(publisher.os, 'replace', side_effect=fail_data):
+            with self.assertRaises(OSError):
+                publisher.publish(self.company, self.candidate, self.hash, artifacts=manifest)
+        self.assertEqual((self.company / 'report.md').read_text(), 'new research')
+        self.assertEqual(self.state.read_bytes(), self.old)
+        self.assertEqual(list(self.company.rglob('.state-write-*.tmp')), [])
+        # Reconcile the pending batch against unchanged state; no backup is needed.
+        self.assertEqual(self.run_cli('--artifacts', str(manifest)).returncode, 0)
+        self.assertEqual(self.state.read_bytes(), self.new)
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ import fcntl
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import tempfile
 import time
@@ -64,10 +64,67 @@ def company_lock(directory, timeout):
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
-def publish(directory, candidate, expected, timeout=5, normalize_time=None):
+def artifact_candidates(directory, manifest):
+    """Read and validate fixed destinations before any live file is replaced."""
+    if manifest is None:
+        return {}
+    mapping = json.loads(Path(manifest).read_text(encoding='utf-8'))
+    if not isinstance(mapping, dict):
+        raise ValueError('Artifacts must map fixed relative paths to candidate files')
+    prepared = {}
+    for name, source in mapping.items():
+        if not isinstance(name, str) or not isinstance(source, str):
+            raise ValueError('Artifact paths must be strings')
+        relative = PurePosixPath(name)
+        if (relative.is_absolute() or '..' in relative.parts or '\\' in name
+                or name != relative.as_posix()
+                or not (name == 'report.md' or (len(relative.parts) > 1
+                                               and relative.parts[0] == 'evidence'))):
+            raise ValueError('Artifacts must target report.md or evidence/ files')
+        target = directory / name
+        if any(part.is_symlink() for part in [target, *target.parents]
+               if part != directory and directory in part.parents):
+            raise ValueError('Artifact destinations must not contain symbolic links')
+        if any(part.exists() and not part.is_dir() for part in target.parents
+               if part != directory and directory in part.parents):
+            raise ValueError('Artifact parent is not a directory')
+        if target.exists() and not target.is_file():
+            raise ValueError('Artifact destination is not a file')
+        prepared[target] = Path(source).read_bytes()
+    return prepared
+
+
+def replace_file(destination, content):
+    """Replace one current file without keeping a previous version or backup."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        fd, temporary = tempfile.mkstemp(prefix='.state-write-', suffix='.tmp',
+                                        dir=destination.parent)
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, destination)
+        temporary = None
+        folder_fd = os.open(destination.parent, os.O_RDONLY)
+        try:
+            os.fsync(folder_fd)
+        finally:
+            os.close(folder_fd)
+        if destination.read_bytes() != content:
+            raise RuntimeError('Readback mismatch: inspect current files before retrying')
+    finally:
+        if temporary is not None:
+            Path(temporary).unlink(missing_ok=True)
+
+
+def publish(directory, candidate, expected, timeout=5, normalize_time=None, artifacts=None):
     """Commit a previously validated candidate using a locked compare-and-swap.
 
-    This does not validate evidence, index links or baseline eligibility.
+    This does not validate evidence, financial conclusions or baseline eligibility.
+    Artifacts are replaced under the same lock, with state published last. A crash
+    between replacements may leave mixed files; callers must check recorded hashes.
     Legacy time normalization requires an externally verified equivalent instant.
     """
     directory = Path(directory).resolve(strict=True)
@@ -82,6 +139,8 @@ def publish(directory, candidate, expected, timeout=5, normalize_time=None):
         if digest(current) != expected:
             raise Rejected(3, 'State changed: reload, reconcile and revalidate before retry')
         if normalize_time is not None:
+            if artifacts is not None:
+                raise ValueError('Time normalization cannot replace report artifacts')
             # Restrict migration to this field; never accept a replacement document.
             timestamp(normalize_time)
             if current is None:
@@ -102,28 +161,15 @@ def publish(directory, candidate, expected, timeout=5, normalize_time=None):
                 raise ValueError('Candidate required')
             new_time = cutoff(proposed)
             if current is not None and new_time < cutoff(current):
-                raise Rejected(5, 'Research cutoff regression: archive without applying')
-        temporary = None
-        try:
-            fd, temporary = tempfile.mkstemp(prefix='.state-write-', suffix='.tmp', dir=directory)
-            with os.fdopen(fd, 'wb') as stream:
-                stream.write(proposed)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, state)
-            temporary = None
-            folder_fd = os.open(directory, os.O_RDONLY)
-            try:
-                os.fsync(folder_fd)
-            finally:
-                os.close(folder_fd)
-            actual = state.read_bytes()
-            if actual != proposed:
-                raise RuntimeError('Readback mismatch: inspect state before retrying')
-            return digest(actual)
-        finally:
-            if temporary is not None:
-                Path(temporary).unlink(missing_ok=True)
+                raise Rejected(5, 'Research cutoff regression: current files unchanged')
+        prepared = artifact_candidates(directory, artifacts)
+        for target, content in prepared.items():
+            replace_file(target, content)
+        replace_file(state, proposed)
+        for target, content in prepared.items():
+            if target.read_bytes() != content:
+                raise RuntimeError('Artifact readback mismatch: reconcile before retrying')
+        return digest(state.read_bytes())
 
 
 def main():
@@ -133,11 +179,13 @@ def main():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument('--candidate')
     source.add_argument('--normalize-time', help='Evidence-verified encoding of the existing cutoff only')
+    parser.add_argument('--artifacts', help='JSON mapping report.md/evidence paths to candidate files')
     parser.add_argument('--expected', required=True, help='SHA-256 of original state bytes, or absent')
     parser.add_argument('--timeout', type=float, default=5)
     args = parser.parse_args()
     try:
-        result = publish(args.directory, args.candidate, args.expected, args.timeout, args.normalize_time)
+        result = publish(args.directory, args.candidate, args.expected, args.timeout,
+                         args.normalize_time, args.artifacts)
     except Rejected as exc:
         print(json.dumps({'error': str(exc), 'code': exc.code}, ensure_ascii=False))
         return exc.code

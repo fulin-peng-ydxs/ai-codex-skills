@@ -1,4 +1,4 @@
 interface:
   display_name: "股票质量与估值分析"
-  short_description: "基于公开证据分析股票质量与估值，严格阻断缺数分析并维护完整报告和跟踪基线"
-  default_prompt: "使用 $investment-stock-analysis 分析指定股票，核验数据完整性，完成原框架研究或跟踪并维护报告档案。"
+  short_description: "基于公开证据分析股票质量与估值，先完成可取证核验，明确真实缺口并就地维护最新报告"
+  default_prompt: "使用 $investment-stock-analysis 分析指定股票，先完成可取得数据的检索和核验，再说明实际缺口；完成原框架研究或跟踪，就地维护唯一最新报告。"
