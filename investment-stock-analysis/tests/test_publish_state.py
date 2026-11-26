@@ -181,19 +181,38 @@ p.publish(sys.argv[2],sys.argv[3],sys.argv[4])
     def test_repeated_report_updates_keep_only_current_files(self):
         report = self.root / 'report.md'
         report.write_text('current research')
-        data = self.root / 'data.json'
+        data = self.root / 'research.json'
         data.write_text('{"current": 1}')
-        manifest = self.artifacts({'report.md': report, 'evidence/data.json': data})
+        manifest = self.artifacts({'report.md': report, 'evidence/research.json': data})
         result = self.run_cli('--artifacts', str(manifest))
         self.assertEqual(result.returncode, 0, result.stdout)
         report.write_text('corrected research')
         result = self.run_cli('--artifacts', str(manifest), expected=publisher.digest(self.new))
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertEqual((self.company / 'report.md').read_text(), 'corrected research')
-        self.assertEqual((self.company / 'evidence/data.json').read_text(), '{"current": 1}')
+        self.assertEqual((self.company / 'evidence/research.json').read_text(), '{"current": 1}')
         self.assertEqual({p.relative_to(self.company).as_posix()
                           for p in self.company.rglob('*') if p.is_file()},
-                         {'.state.lock', 'state.md', 'report.md', 'evidence/data.json'})
+                         {'.state.lock', 'state.md', 'report.md', 'evidence/research.json'})
+
+    def test_legacy_files_publish_without_forcing_record_migration(self):
+        """A local update keeps an existing business-state format and data path."""
+        legacy = self.old + '\n## 当前判断\n\n旧判断核验日期仍保留。\n'.encode()
+        self.state.write_bytes(legacy)
+        candidate = self.new + '\n## 当前判断\n\n仅已复核项目更新，其他日期保留。\n'.encode()
+        self.candidate.write_bytes(candidate)
+        evidence = self.company / 'evidence'
+        evidence.mkdir()
+        (evidence / 'data.json').write_text('{"old": 1}')
+        staged = self.root / 'updated-data.json'
+        staged.write_text('{"updated": 2}')
+        manifest = self.artifacts({'evidence/data.json': staged})
+        result = self.run_cli('--artifacts', str(manifest), expected=publisher.digest(legacy))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.state.read_bytes(), candidate)
+        self.assertEqual((evidence / 'data.json').read_text(), '{"updated": 2}')
+        self.assertFalse((evidence / 'research.json').exists())
+        self.assertEqual({p.name for p in evidence.iterdir()}, {'data.json'})
 
     def test_artifact_conflict_and_old_cutoff_preserve_report(self):
         report = self.company / 'report.md'
